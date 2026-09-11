@@ -57,6 +57,7 @@ wolfdab_source_t *wolfdab_source_open_media_ex(const wchar_t *ffmpeg_exe,const w
     bool network = wcsncmp(media,L"http://",7)==0 || wcsncmp(media,L"https://",8)==0;
     std::wstring cmd=quote_arg(ffmpeg_exe)+L" -nostdin -hide_banner -nostats -loglevel verbose ";
     if(network) cmd+=L"-icy 1 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 ";
+    else cmd+=L"-stream_loop -1 ";
     cmd+=L"-i "+quote_arg(media)+L" -vn -sn -dn -ac 2 -ar "+std::to_wstring(sample_rate)+L" -f s16le -acodec pcm_s16le pipe:1";
     STARTUPINFOW si{};si.cb=sizeof(si);si.dwFlags=STARTF_USESTDHANDLES;si.hStdOutput=wr;si.hStdError=ewr;si.hStdInput=GetStdHandle(STD_INPUT_HANDLE);PROCESS_INFORMATION pi{};
     std::vector<wchar_t> mutable_cmd(cmd.begin(),cmd.end());mutable_cmd.push_back(0);
