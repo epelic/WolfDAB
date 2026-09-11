@@ -1,0 +1,3 @@
+[submodule "third_party/fdk-aac-dabplus"]
+	path = third_party/fdk-aac-dabplus
+	url = https://github.com/Opendigitalradio/fdk-aac.git

@@ -1,0 +1,41 @@
+# WolfDAB
+
+## Italiano
+
+WolfDAB è un trasmettitore multiplex DAB/DAB+ multi-servizio per Windows 10/11 x64 e HackRF One. Include una GUI nativa, fino a 64 servizi entro 864 CU, FIC/MSC, modulazione COFDM Mode I a 2,048 MS/s e uscita diretta libhackrf.
+
+- Audio locale/WASAPI, tono e stream HTTP/HTTPS tramite FFmpeg
+- HE-AAC v1/v2, bitrate, sampling ed EEP configurabili con calcolo CU live
+- Service ID, etichetta lunga, etichetta breve DAB e SubCh
+- DLS manuale e titoli ICY automatici; MOT Slideshow
+- Tutti i blocchi DAB Band III, gain e amplificatore HackRF
+- Configurazioni `.wolfdab`; programma e setup in italiano/inglese
+
+Scaricare `WolfDAB-Setup-x64.exe` da Releases. Usare HackRF con driver WinUSB e un carico fittizio o impianto autorizzato. Ogni trasmissione RF deve rispettare le norme applicabili.
+
+## English
+
+WolfDAB is a multi-service DAB/DAB+ multiplex transmitter for Windows 10/11 x64 and HackRF One. It includes a native GUI, up to 64 services within 864 CU, FIC/MSC generation, Mode I COFDM modulation at 2.048 MS/s, and direct libhackrf output.
+
+- Local/WASAPI audio, test tone, and HTTP/HTTPS streams through FFmpeg
+- Configurable HE-AAC v1/v2, bitrate, sampling, and EEP with live CU calculation
+- Service ID, long label, DAB short label, and SubCh
+- Manual DLS and automatic ICY titles; MOT Slideshow
+- All DAB Band III blocks, HackRF gain, and amplifier control
+- `.wolfdab` configurations; Italian/English application and installer
+
+Download `WolfDAB-Setup-x64.exe` from Releases. Use HackRF with the WinUSB driver and a dummy load or authorized RF system. RF transmissions must comply with applicable regulations.
+
+## Build / Compilazione
+
+Requires MSYS2 UCRT64, CMake, Ninja, GCC, libhackrf, FFTW3f, and PortAudio. The DAB+ FDK-AAC fork is included as a submodule.
+
+```bash
+git clone --recursive <repository-url>
+./setup.sh
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build
+```
+
+See `THIRD_PARTY.md` for dependency licenses. WolfDAB is GPL-3.0-or-later; see `LICENSE`.
