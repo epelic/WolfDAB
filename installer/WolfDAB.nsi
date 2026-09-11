@@ -5,6 +5,11 @@ InstallDir "$PROGRAMFILES64\WolfDAB"
 InstallDirRegKey HKLM "Software\WolfDAB" "InstallDir"
 RequestExecutionLevel admin
 BrandingText "WolfDAB"
+VIProductVersion "1.0.6.0"
+VIAddVersionKey /LANG=1033 "ProductName" "WolfDAB"
+VIAddVersionKey /LANG=1033 "ProductVersion" "1.0.6"
+VIAddVersionKey /LANG=1033 "CompanyName" "Freewaves.it"
+VIAddVersionKey /LANG=1033 "FileDescription" "WolfDAB Installer"
 
 !include "MUI2.nsh"
 !define MUI_ICON "${__FILEDIR__}\..\assets\wolfdab.ico"
@@ -44,6 +49,7 @@ Section "WolfDAB" SEC_MAIN
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WolfDAB" "DisplayIcon" "$INSTDIR\WolfDAB.exe"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WolfDAB" "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WolfDAB" "Publisher" "WolfDAB"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WolfDAB" "DisplayVersion" "1.0.6"
   CreateDirectory "$SMPROGRAMS\WolfDAB"
   CreateShortcut "$SMPROGRAMS\WolfDAB\WolfDAB.lnk" "$INSTDIR\WolfDAB.exe" "" "$INSTDIR\WolfDAB.exe" 0
   CreateShortcut "$DESKTOP\WolfDAB.lnk" "$INSTDIR\WolfDAB.exe" "" "$INSTDIR\WolfDAB.exe" 0
