@@ -22,8 +22,10 @@ int main(int argc, char **argv) {
         MultiByteToWideChar(CP_UTF8,0,argv[1],-1,ffmpeg,1024);
         MultiByteToWideChar(CP_UTF8,0,argv[2],-1,media,1024);
         s=wolfdab_source_open_media(ffmpeg,media); if(!s)return 4;
-        size_t got=wolfdab_source_read(s,pcm.data(),pcm.size()); wolfdab_source_close(s);
-        if(got==0)return 5;
+        size_t total=0;
+        for(int i=0;i<20;++i){size_t got=wolfdab_source_read(s,pcm.data(),pcm.size());if(got==0){wolfdab_source_close(s);return 5;}total+=got;}
+        wolfdab_source_close(s);
+        if(total<=pcm.size())return 6;
     }
     return 0;
 }

@@ -14,6 +14,8 @@ struct wolfdab_source {
     HANDLE process{}, pipe{}, meta_pipe{};
     uint64_t frames_in{}, frames_dropped{};
     int sample_rate{48000};
+    bool network{};
+    std::wstring ffmpeg_exe, media;
     std::string meta_buffer, metadata;
 };
 
@@ -47,23 +49,27 @@ wolfdab_source_t *wolfdab_source_open_tone_ex(double frequency_hz,double level_d
 wolfdab_source_t *wolfdab_source_open_media(const wchar_t *ffmpeg_exe,const wchar_t *media) {
     return wolfdab_source_open_media_ex(ffmpeg_exe, media, 48000);
 }
-wolfdab_source_t *wolfdab_source_open_media_ex(const wchar_t *ffmpeg_exe,const wchar_t *media,int sample_rate) {
-    if(!ffmpeg_exe||!media||!*media)return nullptr;
+static bool launch_media(wolfdab_source_t *s) {
+    if(s->pipe){CloseHandle(s->pipe);s->pipe=nullptr;}if(s->meta_pipe){CloseHandle(s->meta_pipe);s->meta_pipe=nullptr;}if(s->process){WaitForSingleObject(s->process,1000);CloseHandle(s->process);s->process=nullptr;}
     SECURITY_ATTRIBUTES sa{sizeof(sa),nullptr,TRUE}; HANDLE rd{},wr{},erd{},ewr{};
-    if(!CreatePipe(&rd,&wr,&sa,1u<<18))return nullptr;
+    if(!CreatePipe(&rd,&wr,&sa,1u<<18))return false;
     SetHandleInformation(rd,HANDLE_FLAG_INHERIT,0);
-    if(!CreatePipe(&erd,&ewr,&sa,1u<<14)){CloseHandle(rd);CloseHandle(wr);return nullptr;}
+    if(!CreatePipe(&erd,&ewr,&sa,1u<<14)){CloseHandle(rd);CloseHandle(wr);return false;}
     SetHandleInformation(erd,HANDLE_FLAG_INHERIT,0);
-    bool network = wcsncmp(media,L"http://",7)==0 || wcsncmp(media,L"https://",8)==0;
-    std::wstring cmd=quote_arg(ffmpeg_exe)+L" -nostdin -hide_banner -nostats -loglevel verbose ";
-    if(network) cmd+=L"-icy 1 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 ";
+    std::wstring cmd=quote_arg(s->ffmpeg_exe.c_str())+L" -nostdin -hide_banner -nostats -loglevel verbose ";
+    if(s->network) cmd+=L"-icy 1 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 ";
     else cmd+=L"-stream_loop -1 ";
-    cmd+=L"-i "+quote_arg(media)+L" -vn -sn -dn -ac 2 -ar "+std::to_wstring(sample_rate)+L" -f s16le -acodec pcm_s16le pipe:1";
+    cmd+=L"-i "+quote_arg(s->media.c_str())+L" -vn -sn -dn -ac 2 -ar "+std::to_wstring(s->sample_rate)+L" -f s16le -acodec pcm_s16le pipe:1";
     STARTUPINFOW si{};si.cb=sizeof(si);si.dwFlags=STARTF_USESTDHANDLES;si.hStdOutput=wr;si.hStdError=ewr;si.hStdInput=GetStdHandle(STD_INPUT_HANDLE);PROCESS_INFORMATION pi{};
     std::vector<wchar_t> mutable_cmd(cmd.begin(),cmd.end());mutable_cmd.push_back(0);
-    BOOL ok=CreateProcessW(ffmpeg_exe,mutable_cmd.data(),nullptr,nullptr,TRUE,CREATE_NO_WINDOW,nullptr,nullptr,&si,&pi);CloseHandle(wr);CloseHandle(ewr);
-    if(!ok){CloseHandle(rd);CloseHandle(erd);LOGE("FFmpeg CreateProcess failed: %lu",GetLastError());return nullptr;}
-    CloseHandle(pi.hThread);auto*s=new wolfdab_source;s->kind=WOLFDAB_SOURCE_MEDIA;s->sample_rate=sample_rate;s->process=pi.hProcess;s->pipe=rd;s->meta_pipe=erd;return s;
+    BOOL ok=CreateProcessW(s->ffmpeg_exe.c_str(),mutable_cmd.data(),nullptr,nullptr,TRUE,CREATE_NO_WINDOW,nullptr,nullptr,&si,&pi);CloseHandle(wr);CloseHandle(ewr);
+    if(!ok){CloseHandle(rd);CloseHandle(erd);LOGE("FFmpeg CreateProcess failed: %lu",GetLastError());return false;}
+    CloseHandle(pi.hThread);s->process=pi.hProcess;s->pipe=rd;s->meta_pipe=erd;return true;
+}
+wolfdab_source_t *wolfdab_source_open_media_ex(const wchar_t *ffmpeg_exe,const wchar_t *media,int sample_rate) {
+    if(!ffmpeg_exe||!media||!*media)return nullptr;
+    auto*s=new wolfdab_source;s->kind=WOLFDAB_SOURCE_MEDIA;s->sample_rate=sample_rate;s->ffmpeg_exe=ffmpeg_exe;s->media=media;s->network=wcsncmp(media,L"http://",7)==0||wcsncmp(media,L"https://",8)==0;
+    if(!launch_media(s)){delete s;return nullptr;}return s;
 }
 
 static void poll_metadata(wolfdab_source_t *s){
@@ -83,7 +89,7 @@ size_t wolfdab_source_read(wolfdab_source_t*s,int16_t*dst,size_t samples){
         size_t produced=0;for(size_t o=0;o<out_frames;++o){size_t k=(o*3)/2;if(k>=frames)break;dst[2*o]=in[2*k];dst[2*o+1]=in[2*k+1];produced+=2;}return produced;
     }
     if(s->kind==WOLFDAB_SOURCE_TONE){for(size_t i=0;i<samples;i+=2){int16_t v=(int16_t)std::lrint(std::sin(s->phase)*s->amplitude);dst[i]=v;if(i+1<samples)dst[i+1]=v;s->phase+=s->step;if(s->phase>=6.2831853071795864769)s->phase-=6.2831853071795864769;}s->frames_in+=samples/2;return samples;}
-    DWORD got=0;if(!ReadFile(s->pipe,dst,(DWORD)(samples*sizeof(int16_t)),&got,nullptr))return 0;s->frames_in+=got/(2*sizeof(int16_t));return got/sizeof(int16_t);
+    DWORD got=0;BOOL ok=ReadFile(s->pipe,dst,(DWORD)(samples*sizeof(int16_t)),&got,nullptr);if((!ok||!got)&&!s->network){if(!launch_media(s)||!ReadFile(s->pipe,dst,(DWORD)(samples*sizeof(int16_t)),&got,nullptr))return 0;}else if(!ok)return 0;s->frames_in+=got/(2*sizeof(int16_t));return got/sizeof(int16_t);
 }
 void wolfdab_source_get_stats(const wolfdab_source_t*s,pa_source_stats_t*out){if(!s||!out)return;if(s->kind==WOLFDAB_SOURCE_DEVICE){pa_source_get_stats(s->device,out);return;}out->frames_in=s->frames_in;out->frames_dropped=s->frames_dropped;out->ring_fill=0;out->ring_capacity=0;}
 void wolfdab_source_close(wolfdab_source_t*s){if(!s)return;if(s->device)pa_source_close(s->device);if(s->pipe)CloseHandle(s->pipe);if(s->meta_pipe)CloseHandle(s->meta_pipe);if(s->process){TerminateProcess(s->process,0);WaitForSingleObject(s->process,1000);CloseHandle(s->process);}delete s;}
