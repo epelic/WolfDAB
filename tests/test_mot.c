@@ -4,7 +4,7 @@
  *
  * Key checks:
  *   1. User Access LengthIndicator = 2 (TransportId only)
- *   2. DG byte layout: header, extension, segment, UA, segheader, data, CRC
+ *   2. DG byte layout: header, segment, UA, segheader, data, CRC
  *   3. X-PAD CI encoding for appType 1/12/13
  *   4. CRC-16 validation
  */
@@ -142,6 +142,10 @@ int main(void) {
              * Data is reversed: first logical byte nearest to end marker. */
             int dg_length = ((xpad[r - 3] & 0x3F) << 8) | xpad[r - 4];
             CHECK(dg_length > 0, "DG length should be >0, got %d\n", dg_length);
+            uint8_t li_data[2] = { xpad[r - 3], xpad[r - 4] };
+            uint16_t li_crc = (uint16_t)(crc16_ccitt(li_data, 2) ^ 0xFFFF);
+            uint16_t li_stored = (uint16_t)((xpad[r - 5] << 8) | xpad[r - 6]);
+            CHECK(li_crc == li_stored, "DG length indicator CRC mismatch\n");
 
             /* Start collecting the first DG. */
             if (li_count == 1) {
@@ -199,6 +203,7 @@ int main(void) {
                                  &seg_size, &data_off);
     CHECK(rc == 0, "DG parse failed (rc=%d), likely LI bug in UA field\n", rc);
     CHECK(group_type == 3, "first DG should be groupType=3 (header), got %d\n", group_type);
+    CHECK((first_dg[0] & 0x80) == 0, "MOT MSC data group must not set extension flag\n");
     CHECK(tid == 42, "transportId should be 42, got %d\n", tid);
     CHECK(seg_num == 0, "header DG segmentNumber should be 0, got %d\n", seg_num);
     CHECK(last == 1, "header DG lastFlag should be 1\n");
@@ -208,7 +213,8 @@ int main(void) {
     /* Verify data_off + seg_size + 2 (CRC) == first_dg_len. */
     CHECK(data_off + seg_size + 2 == first_dg_len,
           "data_off(%d) + seg_size(%d) + 2 != dg_len(%d)\n",
-          data_off, seg_size, first_dg_len);
+           data_off, seg_size, first_dg_len);
+    CHECK(data_off == 9, "MOT segment payload must start at byte 9, got %d\n", data_off);
 
     printf("First DG: groupType=%d tid=%d segNum=%d last=%d segSize=%d dataOff=%d\n",
            group_type, tid, seg_num, last, seg_size, data_off);

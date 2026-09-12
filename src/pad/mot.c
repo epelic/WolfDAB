@@ -56,11 +56,11 @@ static int build_mot_header(uint8_t *out, size_t cap,
                             int content_type, int content_subtype,
                             const char *content_name) {
     int name_len = content_name ? (int)strlen(content_name) : 0;
-    /* Header core: 7 bytes.
-     * + ContentName param: 2 (PLI+ParamId+DataLen) + 1 (charset) + name_len */
+    /* Header core: 7 bytes, TriggerTime=NOW (PLI 2, four zero bytes),
+     * then the variable-size ContentName parameter. */
     int param_data_len = 1 + name_len; /* charset byte + name */
     int param_total = 2 + param_data_len; /* header extension entry */
-    int header_size = 7 + param_total;
+    int header_size = 7 + 5 + param_total;
 
     if ((size_t)header_size > cap) return -1;
 
@@ -79,6 +79,8 @@ static int build_mot_header(uint8_t *out, size_t cap,
 
     /* Header extension: ContentName (ParamId=12, PLI=3 → DataFieldLength byte) */
     int p = 7;
+    out[p++] = (uint8_t)((2 << 6) | 5); /* TriggerTime, PLI=2 (4 bytes) */
+    out[p++] = 0x00; out[p++] = 0x00; out[p++] = 0x00; out[p++] = 0x00;
     out[p++] = (uint8_t)((3 << 6) | (12 & 0x3F));  /* PLI=3, ParamId=12 */
     out[p++] = (uint8_t)param_data_len;              /* DataFieldLength */
     out[p++] = 0x00; /* charset = EBU Latin (complete) */
@@ -101,17 +103,14 @@ static int build_msc_data_group(uint8_t *out, size_t cap,
                                 const uint8_t *seg_data,
                                 int seg_size,
                                 int continuity_index) {
-    int need = 11 + seg_size + 2; /* DG hdr(2)+ext(2)+seg(2)+ua(3)+segsize(2)+data+crc(2) */
+    int need = 9 + seg_size + 2; /* DG hdr(2)+seg(2)+ua(3)+segsize(2)+data+crc(2) */
     if ((size_t)need > cap) return -1;
 
     int p = 0;
-    /* Byte 0: ExtFlag=1 | CRCFlag=1 | SegFlag=1 | UserAccessFlag=1 | GroupType(4) */
-    out[p++] = (uint8_t)(0x80 | 0x40 | 0x20 | 0x10 | (group_type & 0x0F));
+    /* Byte 0: ExtFlag=0 | CRCFlag=1 | SegFlag=1 | UserAccessFlag=1 | GroupType(4). */
+    out[p++] = (uint8_t)(0x40 | 0x20 | 0x10 | (group_type & 0x0F));
     /* Byte 1: ContinuityIndex(4) | RepetitionIndex(4) */
     out[p++] = (uint8_t)(((continuity_index & 0x0F) << 4) | 0x00);
-    /* Extension field (2 bytes) — unused, set to 0 */
-    out[p++] = 0x00;
-    out[p++] = 0x00;
     /* Segment field: LastFlag(1) | SegmentNumber(15) */
     out[p++] = (uint8_t)((last_flag ? 0x80 : 0x00) | ((segment_number >> 8) & 0x7F));
     out[p++] = (uint8_t)(segment_number & 0xFF);
@@ -312,13 +311,13 @@ int mot_enc_get_xpad(mot_enc_t *e,
 
     switch (e->state) {
     case MOT_STATE_LENGTH_IND: {
-        /* AppType 1: data group length indicator.
-         * Subfield = 4 bytes: 14-bit DG length in bytes 0-1, pad bytes 2-3. */
+        /* AppType 1: two-byte data-group length followed by its CRC. */
         int dg_total = e->dg_len[e->cur_dg];
         li_buf[0] = (uint8_t)((dg_total >> 8) & 0x3F);
         li_buf[1] = (uint8_t)(dg_total & 0xFF);
-        li_buf[2] = 0x00;
-        li_buf[3] = 0x00;
+        uint16_t li_crc = (uint16_t)(crc16_ccitt(li_buf, 2) ^ 0xFFFF);
+        li_buf[2] = (uint8_t)(li_crc >> 8);
+        li_buf[3] = (uint8_t)(li_crc & 0xFF);
         app_type = 1;
         payload = li_buf;
         payload_len = 4;
