@@ -20,8 +20,10 @@
 #include "radio/hackrf_tx.h"
 
 #include <array>
+#include <algorithm>
 #include <cerrno>
 #include <chrono>
+#include <cctype>
 #include <cmath>
 #include <complex>
 #include <csignal>
@@ -30,6 +32,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <deque>
+#include <filesystem>
 #include <string>
 #include <thread>
 #include <vector>
@@ -415,6 +418,13 @@ struct svc_pipe {
     std::deque<std::array<uint8_t, 2048>> cif_queue;
     uint64_t        sf_produced;
     std::string     last_metadata;
+    std::string     mot_folder;
+    unsigned        mot_interval{10};
+    std::vector<std::filesystem::path> mot_files;
+    size_t          mot_index{};
+    uint64_t        mot_fingerprint{};
+    uint16_t        mot_transport_id{10};
+    std::chrono::steady_clock::time_point mot_next_scan{}, mot_next_slide{};
 };
 
 static std::wstring wide_arg(const char *s) {
@@ -437,6 +447,7 @@ static bool svc_pipe_init(svc_pipe &p, const char *source_spec, int bitrate_kbps
                           uint8_t sub_ch_id, uint16_t start_cu,
                           uint16_t service_id, const char *label,
                           const char *dls_text, const char *slide_path,
+                          const char *mot_folder, unsigned mot_interval,
                           epg_t *epg, spi_enc_t *spi) {
     p.desc.service_id     = service_id;
     p.desc.sub_ch_id      = sub_ch_id;
@@ -476,6 +487,8 @@ static bool svc_pipe_init(svc_pipe &p, const char *source_spec, int bitrate_kbps
     if (!p.subch) { dabplus_sf_free(p.sf); aac_enc_close(p.enc); wolfdab_source_close(p.src); return false; }
 
     p.pad = pad_sched_new(dls_text, 0, slide_path);
+    p.mot_folder = mot_folder ? mot_folder : "";
+    p.mot_interval = mot_interval ? mot_interval : 10;
     if (p.pad && epg)
         pad_sched_set_epg(p.pad, epg);
     if (p.pad && spi)
@@ -548,11 +561,50 @@ static void strip_pad_early_aus(uint8_t *sf, size_t sf_len) {
     }
 }
 
+static void svc_pipe_update_mot(svc_pipe &p) {
+    if (!p.pad || p.mot_folder.empty()) return;
+    const auto now = std::chrono::steady_clock::now();
+    bool changed = false;
+    if (now >= p.mot_next_scan) {
+        p.mot_next_scan = now + std::chrono::seconds(1);
+        std::vector<std::filesystem::path> files;
+        uint64_t fingerprint = 1469598103934665603ull;
+        try {
+            for (const auto& entry : std::filesystem::directory_iterator(p.mot_folder)) {
+                if (!entry.is_regular_file()) continue;
+                std::string ext = entry.path().extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c){return (char)std::tolower(c);});
+                if (ext != ".jpg" && ext != ".jpeg" && ext != ".png") continue;
+                files.push_back(entry.path());
+            }
+            std::sort(files.begin(), files.end());
+            for (const auto& file : files) {
+                const std::string key=file.string();
+                for(unsigned char c:key){fingerprint^=c;fingerprint*=1099511628211ull;}
+                fingerprint^=(uint64_t)std::filesystem::file_size(file);fingerprint*=1099511628211ull;
+                fingerprint^=(uint64_t)std::filesystem::last_write_time(file).time_since_epoch().count();fingerprint*=1099511628211ull;
+            }
+        } catch (const std::exception& e) { LOGW("MOT folder scan failed: %s",e.what()); return; }
+        changed = fingerprint != p.mot_fingerprint || files != p.mot_files;
+        if (changed) { p.mot_files=std::move(files);p.mot_fingerprint=fingerprint;p.mot_index=0; }
+    }
+    if (p.mot_files.empty() || (!changed && (now < p.mot_next_slide || !pad_sched_slide_complete(p.pad)))) return;
+    if (p.mot_index >= p.mot_files.size()) p.mot_index=0;
+    const auto& file=p.mot_files[p.mot_index];
+    const std::string path=file.string(), name=file.filename().string();
+    if (pad_sched_set_slide(p.pad,path.c_str(),name.c_str(),++p.mot_transport_id)==0) {
+        LOGI("MOT service %u: %s",p.desc.service_id,path.c_str());
+        p.mot_index=(p.mot_index+1)%p.mot_files.size();
+        p.mot_next_slide=now+std::chrono::seconds(p.mot_interval);
+    }
+}
+
 /* Produce one superframe for a service, slice into CIFs, push to queue.
  * Returns 0 on success, -1 on encoder error. */
 static int svc_pipe_produce(svc_pipe &p) {
     const size_t block = DABTX_AAC_GRANULE * DABTX_AAC_CHANNELS;
     std::vector<int16_t> pcm(block);
+    svc_pipe_update_mot(p);
 
     const char *metadata = wolfdab_source_metadata(p.src);
     if (metadata && p.last_metadata != metadata) {
@@ -657,7 +709,8 @@ static int cmd_tx(const char *const *source_specs, int n_svcs,
                   unsigned txvga_db, int amp_api_flag,
                   uint16_t ensemble_id, uint8_t ecc, const char *ens_label, const char *const *svc_labels,
                   const char *const *dls_texts, const char *const *short_labels,
-                  const char *slide_path, epg_t *epg, spi_enc_t *spi) {
+                  const char *slide_path, const char *const *mot_folders,
+                  const unsigned *mot_intervals, epg_t *epg, spi_enc_t *spi) {
     /*
      * Multi-service TX: N independent audio→encoder→superframe→CIF pipelines
      * feed into a shared MSC frame via dab_msc_frame_build_multi.
@@ -677,7 +730,8 @@ static int cmd_tx(const char *const *source_specs, int n_svcs,
         if (!cu || next_cu + cu > 864 ||
             !svc_pipe_init(pipes[i], source_specs[i], bitrates[i], codecs[i], sample_rates[i], eep_profiles[i],
                            subch_ids[i], start_cu, service_ids[i], svc_labels[i],
-                           dls_texts[i], slide_path, epg, spi)) {
+                           dls_texts[i], slide_path, mot_folders ? mot_folders[i] : nullptr,
+                           mot_intervals ? mot_intervals[i] : 10, epg, spi)) {
             LOGE("failed to init service %d (%s)", i + 1, source_specs[i]);
             for (int j = 0; j < i; ++j) svc_pipe_close(pipes[j]);
             return 1;
@@ -1149,7 +1203,7 @@ int main(int argc, char **argv) {
     unsigned ensemble_id = 0xE001;
     unsigned ensemble_ecc = 0xE0;
     unsigned sid1 = 0xE001, sid2 = 0xE002, scids1 = 0, scids2 = 0, subch1 = 1, subch2 = 2;
-    struct cli_svc { std::string label,source,dls,short_label; unsigned sid,scids,subch,bitrate,codec,sampling,eep; };
+    struct cli_svc { std::string label,source,dls,short_label,mot_folder; unsigned sid,scids,subch,bitrate,codec,sampling,eep,mot_interval; };
     std::vector<cli_svc> cli_services;
     const char *source1 = dabtx_cfg_get(file_cfg, "source");
     const char *source2 = dabtx_cfg_get(file_cfg, "source2");
@@ -1171,8 +1225,8 @@ int main(int argc, char **argv) {
         } else if (std::strcmp(argv[i], "--svc") == 0 && i + 1 < argc) {
             std::string packed=argv[++i];std::vector<std::string> f;size_t p=0;
             while(true){size_t q=packed.find("~|~",p);f.push_back(packed.substr(p,q==std::string::npos?q:q-p));if(q==std::string::npos)break;p=q+3;}
-            if(f.size()!=10&&f.size()!=11){LOGE("invalid --svc record");return 2;}
-            cli_services.push_back({f[7],f[8],f[9],f.size()==11?f[10]:"",(unsigned)std::strtoul(f[0].c_str(),nullptr,0),(unsigned)std::strtoul(f[1].c_str(),nullptr,0),(unsigned)std::strtoul(f[2].c_str(),nullptr,0),(unsigned)std::strtoul(f[3].c_str(),nullptr,0),(unsigned)std::strtoul(f[4].c_str(),nullptr,0),(unsigned)std::strtoul(f[5].c_str(),nullptr,0),(unsigned)std::strtoul(f[6].c_str(),nullptr,0)});
+            if(f.size()!=10&&f.size()!=11&&f.size()!=13){LOGE("invalid --svc record");return 2;}
+            cli_services.push_back({f[7],f[8],f[9],f.size()>=11?f[10]:"",f.size()==13?f[11]:"",(unsigned)std::strtoul(f[0].c_str(),nullptr,0),(unsigned)std::strtoul(f[1].c_str(),nullptr,0),(unsigned)std::strtoul(f[2].c_str(),nullptr,0),(unsigned)std::strtoul(f[3].c_str(),nullptr,0),(unsigned)std::strtoul(f[4].c_str(),nullptr,0),(unsigned)std::strtoul(f[5].c_str(),nullptr,0),(unsigned)std::strtoul(f[6].c_str(),nullptr,0),f.size()==13?(unsigned)std::strtoul(f[12].c_str(),nullptr,10):10u});
         } else if (std::strcmp(argv[i], "--ensemble") == 0 && i + 1 < argc) {
             dab_label_pad(argv[++i], ens_buf);
         } else if (std::strcmp(argv[i], "--ensemble-id") == 0 && i + 1 < argc) {
@@ -1266,10 +1320,10 @@ int main(int argc, char **argv) {
             unsigned vga = (i + 4 < nargs && args[i + 4][0] != '-') ?
                            (unsigned)std::atoi(args[i + 4]) : 0u;
             if(!cli_services.empty()){
-                int n=(int)cli_services.size();std::vector<const char*> ss(n),ls(n),ds(n),sls(n);std::vector<int> br(n),co(n),sr(n);std::vector<dab_eep_profile_t> ep(n);std::vector<uint16_t> si(n);std::vector<uint8_t> sc(n),su(n);std::vector<std::array<char,17>> lp(n);
-                for(int k=0;k<n;++k){auto&v=cli_services[k];if(v.codec>2||v.sampling!=32000&&v.sampling!=48000||v.eep> DAB_EEP_4B){LOGE("invalid service format");return 2;}dab_label_pad(v.label.c_str(),lp[k].data());ss[k]=v.source.c_str();ls[k]=lp[k].data();ds[k]=v.dls.c_str();sls[k]=v.short_label.c_str();br[k]=(int)v.bitrate;co[k]=(int)v.codec;sr[k]=(int)v.sampling;ep[k]=(dab_eep_profile_t)v.eep;si[k]=(uint16_t)v.sid;sc[k]=(uint8_t)v.scids;su[k]=(uint8_t)v.subch;}
+                int n=(int)cli_services.size();std::vector<const char*> ss(n),ls(n),ds(n),sls(n),mf(n);std::vector<int> br(n),co(n),sr(n);std::vector<unsigned> mi(n);std::vector<dab_eep_profile_t> ep(n);std::vector<uint16_t> si(n);std::vector<uint8_t> sc(n),su(n);std::vector<std::array<char,17>> lp(n);
+                for(int k=0;k<n;++k){auto&v=cli_services[k];if(v.codec>2||v.sampling!=32000&&v.sampling!=48000||v.eep> DAB_EEP_4B){LOGE("invalid service format");return 2;}dab_label_pad(v.label.c_str(),lp[k].data());ss[k]=v.source.c_str();ls[k]=lp[k].data();ds[k]=v.dls.c_str();sls[k]=v.short_label.c_str();mf[k]=v.mot_folder.c_str();mi[k]=v.mot_interval;br[k]=(int)v.bitrate;co[k]=(int)v.codec;sr[k]=(int)v.sampling;ep[k]=(dab_eep_profile_t)v.eep;si[k]=(uint16_t)v.sid;sc[k]=(uint8_t)v.scids;su[k]=(uint8_t)v.subch;}
                 if(ensemble_id>0xffff||ensemble_ecc>0xff){LOGE("invalid ensemble identity");return 2;}
-                return cmd_tx(ss.data(),n,br.data(),co.data(),sr.data(),ep.data(),si.data(),sc.data(),su.data(),ch,sec,vga,amp_api_flag,(uint16_t)ensemble_id,(uint8_t)ensemble_ecc,ens_buf,ls.data(),ds.data(),sls.data(),slide_path,epg,spi);
+                return cmd_tx(ss.data(),n,br.data(),co.data(),sr.data(),ep.data(),si.data(),sc.data(),su.data(),ch,sec,vga,amp_api_flag,(uint16_t)ensemble_id,(uint8_t)ensemble_ecc,ens_buf,ls.data(),ds.data(),sls.data(),slide_path,mf.data(),mi.data(),epg,spi);
             }
             int n_svcs;
             const char *sources[2];
@@ -1294,7 +1348,7 @@ int main(int argc, char **argv) {
             int bitrates[2] = {72,72}; dab_eep_profile_t eep[2] = {DAB_EEP_3A,DAB_EEP_3A};
             if(ensemble_id>0xffff||ensemble_ecc>0xff){LOGE("invalid ensemble identity");return 2;}
             return cmd_tx(sources, n_svcs, bitrates, codecs, sample_rates, eep, service_ids, scids, subchs, ch, sec, vga, amp_api_flag, (uint16_t)ensemble_id, (uint8_t)ensemble_ecc, ens_buf, labels, dls, nullptr,
-                          slide_path, epg, spi);
+                          slide_path, nullptr, nullptr, epg, spi);
         }
         if (a == "--tx-file" && i + 4 < nargs) {
             const char *ch = args[i + 1];

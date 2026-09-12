@@ -9,6 +9,7 @@
  *   4. CRC-16 validation
  */
 #include "pad/mot.h"
+#include "pad/pad_sched.h"
 #include "common/crc16.h"
 
 #include <stdio.h>
@@ -213,6 +214,15 @@ int main(void) {
            group_type, tid, seg_num, last, seg_size, data_off);
 
     mot_enc_free(enc);
+
+    pad_sched_t *sched=pad_sched_new("MOT test",0,NULL);
+    CHECK(sched!=NULL,"pad scheduler creation failed\n");
+    CHECK(pad_sched_set_slide(sched,img_path,"updated.jpg",77)==0,
+          "dynamic MOT image update failed\n");
+    uint8_t live_xpad[PAD_SCHED_XPAD_MAX];uint8_t live_f0=0,live_f1=0;
+    CHECK(pad_sched_get_xpad(sched,live_xpad,sizeof(live_xpad),&live_f0,&live_f1)>0,
+          "dynamic MOT image produced no X-PAD\n");
+    pad_sched_free(sched);
     remove(img_path);
 
     printf("test_mot: PASS\n");

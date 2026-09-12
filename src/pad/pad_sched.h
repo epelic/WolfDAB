@@ -35,6 +35,9 @@ void pad_sched_set_epg(pad_sched_t *s, epg_t *epg);
  * spi is NOT owned by the scheduler — caller must keep it alive. */
 void pad_sched_set_spi(pad_sched_t *s, spi_enc_t *spi);
 void pad_sched_set_dls(pad_sched_t *s, const char *text);
+int pad_sched_set_slide(pad_sched_t *s, const char *image_path,
+                         const char *content_name, uint16_t transport_id);
+int pad_sched_slide_complete(const pad_sched_t *s);
 
 /* Get next X-PAD + F-PAD.  Automatically interleaves DLS and MOT.
  * Returns X-PAD byte count, or 0 if nothing to send. */

@@ -7,7 +7,7 @@ WolfDAB è un trasmettitore multiplex DAB/DAB+ multi-servizio per Windows 10/11 
 - Audio locale/WASAPI, tono e stream HTTP/HTTPS tramite FFmpeg
 - HE-AAC v1/v2, bitrate, sampling ed EEP configurabili con calcolo CU live
 - Service ID, etichetta lunga, etichetta breve DAB e SubCh
-- DLS manuale e titoli ICY automatici; MOT Slideshow
+- DLS manuale e titoli ICY automatici; cartella MOT Slideshow per ogni servizio con rotazione temporizzata e aggiornamenti live
 - Tutti i blocchi DAB Band III, gain e amplificatore HackRF
 - Configurazioni `.wolfdab`; programma e setup in italiano/inglese
 
@@ -20,7 +20,7 @@ WolfDAB is a multi-service DAB/DAB+ multiplex transmitter for Windows 10/11 x64 
 - Local/WASAPI audio, test tone, and HTTP/HTTPS streams through FFmpeg
 - Configurable HE-AAC v1/v2, bitrate, sampling, and EEP with live CU calculation
 - Service ID, long label, DAB short label, and SubCh
-- Manual DLS and automatic ICY titles; MOT Slideshow
+- Manual DLS and automatic ICY titles; per-service MOT Slideshow folders with timed rotation and live updates
 - All DAB Band III blocks, HackRF gain, and amplifier control
 - `.wolfdab` configurations; Italian/English application and installer
 

@@ -33,6 +33,7 @@ struct pad_sched {
     int  burst_count;      /* counts MOT fields in current burst */
     int  idle_count;       /* counts calls since last MOT completion */
     int  mot_active;       /* nonzero while MOT is transmitting */
+    int  mot_auto_retx;    /* legacy single-slide automatic retransmission */
     int  spi_active;       /* nonzero while SPI MOT is transmitting */
     int  spi_next;         /* 1 = next MOT cycle should be SPI */
 
@@ -56,6 +57,7 @@ pad_sched_t *pad_sched_new(const char *dls_text, int charset,
         s->mot = mot_enc_new(slide_path, "logo.jpg", 1);
 
     s->mot_active = (s->mot != NULL) ? 1 : 0;
+    s->mot_auto_retx = 1;
     s->burst_count = 0;
     s->idle_count = 0;
     if (dls_text) {
@@ -80,6 +82,27 @@ void pad_sched_set_dls(pad_sched_t *s, const char *text) {
     if (!s->dls) s->dls = dls_enc_new(s->station_dls, 0);
     else dls_enc_set_text(s->dls, s->station_dls);
     s->epg_showing = 0;
+}
+
+int pad_sched_set_slide(pad_sched_t *s, const char *image_path,
+                        const char *content_name, uint16_t transport_id) {
+    if (!s || !image_path || !image_path[0]) return -1;
+    mot_enc_t *next = mot_enc_new(image_path,
+                                  content_name && content_name[0] ? content_name : "slide.jpg",
+                                  transport_id ? transport_id : 1);
+    if (!next) return -1;
+    if (s->mot) mot_enc_free(s->mot);
+    s->mot = next;
+    s->mot_active = 1;
+    s->mot_auto_retx = 0;
+    s->spi_active = 0;
+    s->burst_count = 0;
+    s->idle_count = 0;
+    return 0;
+}
+
+int pad_sched_slide_complete(const pad_sched_t *s) {
+    return !s || !s->mot || mot_enc_complete(s->mot);
 }
 
 void pad_sched_free(pad_sched_t *s) {
@@ -139,7 +162,7 @@ int pad_sched_get_xpad(pad_sched_t *s,
                     s->spi_active = 1;
                     s->spi_next = 0;
                 }
-            } else if (s->mot) {
+            } else if (s->mot && s->mot_auto_retx) {
                 mot_enc_restart(s->mot);
                 s->mot_active = 1;
                 s->spi_next = (s->spi != NULL) ? 1 : 0;
