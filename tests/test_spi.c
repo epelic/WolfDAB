@@ -92,6 +92,18 @@ int main(void) {
     CHECK(p[6] == 0xE1, "UAType_lo|len should be 0xE1, got 0x%02x\n", p[6]);
     CHECK(p[7] == 0x01, "SPI profile byte should be 0x01\n");
 
+    fib_reset(&fib);
+    fig0_13_app_t slideshow = {
+        .service_id = 0x43E7, .sc_ids = 7, .ua_type = 0x002,
+        .ua_data = { 0x0C, 0x3C }, .ua_data_len = 2,
+    };
+    CHECK(fig0_13_write(&fib, &slideshow) == 0, "SlideShow FIG 0/13 failed\n");
+    CHECK(fib.used == 9, "SlideShow FIG 0/13 size should be 9, got %zu\n", fib.used);
+    CHECK(fib.bytes[2] == 0x43 && fib.bytes[3] == 0xE7, "SlideShow SId mismatch\n");
+    CHECK(fib.bytes[4] == 0x71, "SlideShow SCIdS/No mismatch\n");
+    CHECK(fib.bytes[5] == 0x00 && fib.bytes[6] == 0x42, "SlideShow UA type/length mismatch\n");
+    CHECK(fib.bytes[7] == 0x0C && fib.bytes[8] == 0x3C, "SlideShow X-PAD signalling mismatch\n");
+
     printf("FIG 0/13: ");
     for (int i = 0; i < 8; ++i) printf("%02x ", p[i]);
     printf("\n");

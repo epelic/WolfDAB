@@ -237,6 +237,7 @@ struct dab_svc_desc {
     dab_eep_profile_t eep_profile;
     const char *label;             /* exactly 16 chars, space-padded */
     uint16_t short_label_flag;
+    bool mot_slideshow;
 };
 
 static uint16_t short_label_flag(const char *label,const char *short_label){
@@ -259,9 +260,26 @@ static void build_fic_frame(uint8_t *fics /* 96 bytes */, uint32_t frame_count,
     for(int i=first;i<n_svcs&&i<first+4;++i){fig0_2_audio_t f={.service_id=svcs[i].service_id,.ca_id=0,.local_flag=0,.asc_type=63,.sub_ch_id=svcs[i].sub_ch_id};fig0_2_audio_write(&fib,&f);}
     fib_finalize(&fib);std::memcpy(fics+32,fib.bytes,32);
     fib_reset(&fib);
-    fig0_9_write(&fib,ecc);
-    if((frame_count&1u)==0){for(int i=first;i<n_svcs&&i<first+4;++i){fig0_8_audio_t f={.service_id=svcs[i].service_id,.sc_ids=svcs[i].sc_ids,.sub_ch_id=svcs[i].sub_ch_id};fig0_8_audio_write(&fib,&f);}}
-    else {int slot=(int)((frame_count/2u)%(unsigned)(n_svcs+1));if(slot==0)fig1_0_write(&fib,ensemble_id,ens_label,0);else fig1_1_write(&fib,svcs[slot-1].service_id,svcs[slot-1].label,svcs[slot-1].short_label_flag);}
+    const unsigned carousel=(unsigned)(frame_count%3u);
+    if(carousel==0){
+        fig0_9_write(&fib,ecc);
+        for(int i=first;i<n_svcs&&i<first+4;++i){fig0_8_audio_t f={.service_id=svcs[i].service_id,.sc_ids=svcs[i].sc_ids,.sub_ch_id=svcs[i].sub_ch_id};fig0_8_audio_write(&fib,&f);}
+    }
+    else if(carousel==1){
+        fig0_9_write(&fib,ecc);
+        int slot=(int)(((frame_count/3u)%(unsigned)(n_svcs+1)));
+        if(slot==0)fig1_0_write(&fib,ensemble_id,ens_label,0);else fig1_1_write(&fib,svcs[slot-1].service_id,svcs[slot-1].label,svcs[slot-1].short_label_flag);
+    }
+    else {
+        /* TS 101 499 requires MOT SlideShow to be announced in FIG 0/13.
+         * Audio X-PAD application data: AppTy=12, DG=0, DSCTy=60 (MOT). */
+        int mot_count=0;for(int i=0;i<n_svcs;++i)if(svcs[i].mot_slideshow)++mot_count;
+        if(mot_count==0)fig0_9_write(&fib,ecc);
+        else {
+            int page13=(int)((frame_count/3u)%((unsigned)(mot_count+2)/3u));int skip=page13*3,written=0;
+            for(int i=0;i<n_svcs&&written<3;++i)if(svcs[i].mot_slideshow){if(skip){--skip;continue;}fig0_13_app_t f={.service_id=svcs[i].service_id,.sc_ids=svcs[i].sc_ids,.ua_type=0x002,.ua_data={0x0C,0x3C},.ua_data_len=2};if(fig0_13_write(&fib,&f)==0)++written;}
+        }
+    }
     fib_finalize(&fib);std::memcpy(fics+64,fib.bytes,32);
 }
 
@@ -489,6 +507,7 @@ static bool svc_pipe_init(svc_pipe &p, const char *source_spec, int bitrate_kbps
     p.pad = pad_sched_new(dls_text, 0, slide_path);
     p.mot_folder = mot_folder ? mot_folder : "";
     p.mot_interval = mot_interval ? mot_interval : 10;
+    p.desc.mot_slideshow = (slide_path && *slide_path) || !p.mot_folder.empty();
     if (p.pad && epg)
         pad_sched_set_epg(p.pad, epg);
     if (p.pad && spi)
