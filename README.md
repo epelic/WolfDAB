@@ -1,5 +1,7 @@
 <img width="512" height="512" alt="Immagine Codex 10 set 2026, 15_42_13" src="https://github.com/user-attachments/assets/90032916-957e-4145-a93d-257b77f727cc" />
+
 # WolfDAB
+Scaricalo qui! https://www.freewaves.it/wolfdab.html o dalle releases qui su Github.
 
 ## Italiano
 
@@ -19,6 +21,8 @@ WolfDAB è un trasmettitore multiplex DAB/DAB+ multi-servizio per Windows 10/11 
 Scaricare `WolfDAB-Setup-x64.exe` da Releases. WolfDAB è gratuito e permanente dopo l'attivazione, ma non si avvia finché non viene inserito il codice gratuito richiesto dal modulo interno. Usare HackRF con driver WinUSB e un carico fittizio o impianto autorizzato. Ogni trasmissione RF deve rispettare le norme applicabili.
 
 ## English
+
+Download it here! https://www.freewaves.it/wolfdab.html or from the releases here on Github.
 
 WolfDAB is a multi-service DAB/DAB+ multiplex transmitter for Windows 10/11 x64 and HackRF One. It includes a native GUI, up to 64 services within 864 CU, FIC/MSC generation, Mode I COFDM modulation at 2.048 MS/s, and direct libhackrf output.
 
