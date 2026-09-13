@@ -43,5 +43,9 @@ fr:{privacy:'Le formulaire intégré envoie le nom, l’e-mail, un identifiant p
 for(const [lang,c] of Object.entries(registrationCopy)){document.querySelector(`.registration .privacy[data-lang="${lang}"]`).innerHTML=c.privacy;document.querySelectorAll('.registration .step')[0].querySelector(`[data-lang="${lang}"]`).textContent=c.one;}
 document.querySelectorAll('.registration .step')[1].lastElementChild.innerHTML=Object.entries(registrationCopy).map(([lang,c])=>`<span data-lang="${lang}">${c.two}</span>`).join('');
 setLanguage(localStorage.getItem('wolfdab-lang')||((navigator.language||'it').slice(0,2)));
+const streamPalSection=document.querySelector('.other');
+streamPalSection.setAttribute('role','link');streamPalSection.setAttribute('tabindex','0');streamPalSection.setAttribute('aria-label','Open StreamPAL');streamPalSection.style.cursor='pointer';
+streamPalSection.addEventListener('click',()=>location.href='https://www.freewaves.it/streampal.html');
+streamPalSection.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();location.href='https://www.freewaves.it/streampal.html';}});
 </script>
 </body></html>
