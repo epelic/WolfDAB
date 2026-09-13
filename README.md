@@ -1,3 +1,4 @@
+<img width="512" height="512" alt="Immagine Codex 10 set 2026, 15_42_13" src="https://github.com/user-attachments/assets/90032916-957e-4145-a93d-257b77f727cc" />
 # WolfDAB
 
 ## Italiano
