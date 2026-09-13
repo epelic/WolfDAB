@@ -5,10 +5,10 @@ InstallDir "$PROGRAMFILES64\WolfDAB"
 InstallDirRegKey HKLM "Software\WolfDAB" "InstallDir"
 RequestExecutionLevel admin
 BrandingText "WolfDAB"
-VIProductVersion "1.0.10.0"
+VIProductVersion "1.0.11.0"
 VIAddVersionKey /LANG=1033 "ProductName" "WolfDAB"
-VIAddVersionKey /LANG=1033 "ProductVersion" "1.0.10"
-VIAddVersionKey /LANG=1033 "FileVersion" "1.0.10"
+VIAddVersionKey /LANG=1033 "ProductVersion" "1.0.11"
+VIAddVersionKey /LANG=1033 "FileVersion" "1.0.11"
 VIAddVersionKey /LANG=1033 "CompanyName" "Freewaves.it"
 VIAddVersionKey /LANG=1033 "FileDescription" "WolfDAB Installer"
 VIAddVersionKey /LANG=1033 "LegalCopyright" "Copyright Freewaves.it - Emanuele Pelicioli"
@@ -51,7 +51,7 @@ Section "WolfDAB" SEC_MAIN
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WolfDAB" "DisplayIcon" "$INSTDIR\WolfDAB.exe"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WolfDAB" "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WolfDAB" "Publisher" "WolfDAB"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WolfDAB" "DisplayVersion" "1.0.10"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WolfDAB" "DisplayVersion" "1.0.11"
   CreateDirectory "$SMPROGRAMS\WolfDAB"
   CreateShortcut "$SMPROGRAMS\WolfDAB\WolfDAB.lnk" "$INSTDIR\WolfDAB.exe" "" "$INSTDIR\WolfDAB.exe" 0
   CreateShortcut "$DESKTOP\WolfDAB.lnk" "$INSTDIR\WolfDAB.exe" "" "$INSTDIR\WolfDAB.exe" 0

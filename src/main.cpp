@@ -238,6 +238,7 @@ struct dab_svc_desc {
     const char *label;             /* exactly 16 chars, space-padded */
     uint16_t short_label_flag;
     bool mot_slideshow;
+    uint8_t pty;
 };
 
 static uint16_t short_label_flag(const char *label,const char *short_label){
@@ -260,25 +261,29 @@ static void build_fic_frame(uint8_t *fics /* 96 bytes */, uint32_t frame_count,
     for(int i=first;i<n_svcs&&i<first+4;++i){fig0_2_audio_t f={.service_id=svcs[i].service_id,.ca_id=0,.local_flag=0,.asc_type=63,.sub_ch_id=svcs[i].sub_ch_id};fig0_2_audio_write(&fib,&f);}
     fib_finalize(&fib);std::memcpy(fics+32,fib.bytes,32);
     fib_reset(&fib);
-    const unsigned carousel=(unsigned)(frame_count%3u);
+    const unsigned carousel=(unsigned)(frame_count%4u);
     if(carousel==0){
         fig0_9_write(&fib,ecc);
         for(int i=first;i<n_svcs&&i<first+4;++i){fig0_8_audio_t f={.service_id=svcs[i].service_id,.sc_ids=svcs[i].sc_ids,.sub_ch_id=svcs[i].sub_ch_id};fig0_8_audio_write(&fib,&f);}
     }
     else if(carousel==1){
         fig0_9_write(&fib,ecc);
-        int slot=(int)(((frame_count/3u)%(unsigned)(n_svcs+1)));
+        int slot=(int)(((frame_count/4u)%(unsigned)(n_svcs+1)));
         if(slot==0)fig1_0_write(&fib,ensemble_id,ens_label,0);else fig1_1_write(&fib,svcs[slot-1].service_id,svcs[slot-1].label,svcs[slot-1].short_label_flag);
     }
-    else {
+    else if(carousel==2) {
         /* TS 101 499 requires MOT SlideShow to be announced in FIG 0/13.
          * Audio X-PAD application data: AppTy=12, DG=0, DSCTy=60 (MOT). */
         int mot_count=0;for(int i=0;i<n_svcs;++i)if(svcs[i].mot_slideshow)++mot_count;
         if(mot_count==0)fig0_9_write(&fib,ecc);
         else {
-            int page13=(int)((frame_count/3u)%((unsigned)(mot_count+2)/3u));int skip=page13*3,written=0;
+            int page13=(int)((frame_count/4u)%((unsigned)(mot_count+2)/3u));int skip=page13*3,written=0;
             for(int i=0;i<n_svcs&&written<3;++i)if(svcs[i].mot_slideshow){if(skip){--skip;continue;}fig0_13_app_t f={.service_id=svcs[i].service_id,.sc_ids=svcs[i].sc_ids,.ua_type=0x002,.ua_data={0x0C,0x3C},.ua_data_len=2};if(fig0_13_write(&fib,&f)==0)++written;}
         }
+    }
+    else {
+        int first17=(int)(((frame_count/4u)%((unsigned)(n_svcs+4)/5u))*5u);
+        for(int i=first17;i<n_svcs&&i<first17+5;++i){fig0_17_t f={.service_id=svcs[i].service_id,.pty=svcs[i].pty};fig0_17_write(&fib,&f);}
     }
     fib_finalize(&fib);std::memcpy(fics+64,fib.bytes,32);
 }
@@ -438,6 +443,7 @@ struct svc_pipe {
     std::string     last_metadata;
     std::string     mot_folder;
     unsigned        mot_interval{10};
+    int             channels{2};
     std::vector<std::filesystem::path> mot_files;
     size_t          mot_index{};
     uint64_t        mot_fingerprint{};
@@ -460,7 +466,7 @@ static wolfdab_source_t *open_source_spec(const char *spec, int sample_rate) {
 }
 
 static bool svc_pipe_init(svc_pipe &p, const char *source_spec, int bitrate_kbps,
-                          int codec, int sample_rate,
+                          int codec, int sample_rate, int channels,
                           dab_eep_profile_t eep_profile,
                           uint8_t sub_ch_id, uint16_t start_cu,
                           uint16_t service_id, const char *label,
@@ -481,11 +487,12 @@ static bool svc_pipe_init(svc_pipe &p, const char *source_spec, int bitrate_kbps
 
     int actual_codec=codec;
     const int enc_mode=actual_codec==0?DABTX_AAC_MODE_DABPLUS_LC:actual_codec==2?DABTX_AAC_MODE_DABPLUS_PS:DABTX_AAC_MODE_DABPLUS_SBR;
-    p.enc = aac_enc_open_ex(enc_mode, bitrate_kbps * 1000, sample_rate);
+    p.channels = channels;
+    p.enc = aac_enc_open_ex_channels(enc_mode, bitrate_kbps * 1000, sample_rate, channels);
     if(!p.enc&&actual_codec==2){
         LOGW("HE-AAC v2 is not accepted at %d kbps/%d Hz; using HE-AAC v1",bitrate_kbps,sample_rate);
         actual_codec=1;
-        p.enc=aac_enc_open_ex(DABTX_AAC_MODE_DABPLUS_SBR,bitrate_kbps*1000,sample_rate);
+        p.enc=aac_enc_open_ex_channels(DABTX_AAC_MODE_DABPLUS_SBR,bitrate_kbps*1000,sample_rate,channels);
     }
     if (!p.enc) { wolfdab_source_close(p.src); p.src = nullptr; return false; }
 
@@ -494,8 +501,8 @@ static bool svc_pipe_init(svc_pipe &p, const char *source_spec, int bitrate_kbps
         .num_aus          = actual_codec==0 ? sample_rate/8000 : sample_rate/16000,
         .dac_rate         = sample_rate==48000,
         .sbr_flag         = actual_codec==0 ? 0 : 1,
-        .aac_channel_mode = actual_codec==2 ? 0 : 1,
-        .ps_flag          = actual_codec==2 ? 1 : 0,
+        .aac_channel_mode = channels==1 || actual_codec==2 ? 0 : 1,
+        .ps_flag          = channels==2 && actual_codec==2 ? 1 : 0,
         .mpeg_surround    = 0,
     };
     p.sf = dabplus_sf_new(&sf_cfg);
@@ -623,6 +630,7 @@ static void svc_pipe_update_mot(svc_pipe &p) {
 static int svc_pipe_produce(svc_pipe &p) {
     const size_t block = DABTX_AAC_GRANULE * DABTX_AAC_CHANNELS;
     std::vector<int16_t> pcm(block);
+    std::vector<int16_t> mono(DABTX_AAC_GRANULE);
     svc_pipe_update_mot(p);
 
     const char *metadata = wolfdab_source_metadata(p.src);
@@ -689,7 +697,9 @@ static int svc_pipe_produce(svc_pipe &p) {
             got += r;
         }
         if (stop_requested()) break;
-        if (aac_enc_frame(p.enc, pcm.data(),
+        const int16_t *encoder_pcm=pcm.data();
+        if(p.channels==1){for(size_t n=0;n<DABTX_AAC_GRANULE;++n)mono[n]=(int16_t)(((int32_t)pcm[n*2]+(int32_t)pcm[n*2+1])/2);encoder_pcm=mono.data();}
+        if (aac_enc_frame(p.enc, encoder_pcm,
                           p.sf_raw.data(), p.sf_raw.size(),
                           &sf_out_len, anc, anc_len) != 0) {
             return -1;
@@ -720,10 +730,10 @@ static int svc_pipe_produce(svc_pipe &p) {
 }
 
 static int cmd_tx(const char *const *source_specs, int n_svcs,
-                  const int *bitrates, const int *codecs, const int *sample_rates,
+                  const int *bitrates, const int *codecs, const int *sample_rates, const int *channels,
                   const dab_eep_profile_t *eep_profiles,
                   const uint16_t *service_ids, const uint8_t *scids,
-                  const uint8_t *subch_ids,
+                  const uint8_t *subch_ids, const uint8_t *ptys,
                   const char *channel_label, int seconds,
                   unsigned txvga_db, int amp_api_flag,
                   uint16_t ensemble_id, uint8_t ecc, const char *ens_label, const char *const *svc_labels,
@@ -747,7 +757,7 @@ static int cmd_tx(const char *const *source_specs, int n_svcs,
         const unsigned cu = dab_eep_cu_for_bitrate((unsigned)bitrates[i], eep_profiles[i]);
         const uint16_t start_cu = next_cu;
         if (!cu || next_cu + cu > 864 ||
-            !svc_pipe_init(pipes[i], source_specs[i], bitrates[i], codecs[i], sample_rates[i], eep_profiles[i],
+            !svc_pipe_init(pipes[i], source_specs[i], bitrates[i], codecs[i], sample_rates[i], channels ? channels[i] : 2, eep_profiles[i],
                            subch_ids[i], start_cu, service_ids[i], svc_labels[i],
                            dls_texts[i], slide_path, mot_folders ? mot_folders[i] : nullptr,
                            mot_intervals ? mot_intervals[i] : 10, epg, spi)) {
@@ -757,6 +767,7 @@ static int cmd_tx(const char *const *source_specs, int n_svcs,
         }
         next_cu = (uint16_t)(next_cu + cu);
         pipes[i].desc.sc_ids = scids[i];
+        pipes[i].desc.pty = ptys ? ptys[i] : 0;
         pipes[i].desc.short_label_flag=short_label_flag(svc_labels[i],short_labels?short_labels[i]:nullptr);
     }
 
@@ -1222,7 +1233,7 @@ int main(int argc, char **argv) {
     unsigned ensemble_id = 0xE001;
     unsigned ensemble_ecc = 0xE0;
     unsigned sid1 = 0xE001, sid2 = 0xE002, scids1 = 0, scids2 = 0, subch1 = 1, subch2 = 2;
-    struct cli_svc { std::string label,source,dls,short_label,mot_folder; unsigned sid,scids,subch,bitrate,codec,sampling,eep,mot_interval; };
+    struct cli_svc { std::string label,source,dls,short_label,mot_folder; unsigned sid,scids,subch,bitrate,codec,sampling,eep,mot_interval,pty,channels; };
     std::vector<cli_svc> cli_services;
     const char *source1 = dabtx_cfg_get(file_cfg, "source");
     const char *source2 = dabtx_cfg_get(file_cfg, "source2");
@@ -1244,8 +1255,8 @@ int main(int argc, char **argv) {
         } else if (std::strcmp(argv[i], "--svc") == 0 && i + 1 < argc) {
             std::string packed=argv[++i];std::vector<std::string> f;size_t p=0;
             while(true){size_t q=packed.find("~|~",p);f.push_back(packed.substr(p,q==std::string::npos?q:q-p));if(q==std::string::npos)break;p=q+3;}
-            if(f.size()!=10&&f.size()!=11&&f.size()!=13){LOGE("invalid --svc record");return 2;}
-            cli_services.push_back({f[7],f[8],f[9],f.size()>=11?f[10]:"",f.size()==13?f[11]:"",(unsigned)std::strtoul(f[0].c_str(),nullptr,0),(unsigned)std::strtoul(f[1].c_str(),nullptr,0),(unsigned)std::strtoul(f[2].c_str(),nullptr,0),(unsigned)std::strtoul(f[3].c_str(),nullptr,0),(unsigned)std::strtoul(f[4].c_str(),nullptr,0),(unsigned)std::strtoul(f[5].c_str(),nullptr,0),(unsigned)std::strtoul(f[6].c_str(),nullptr,0),f.size()==13?(unsigned)std::strtoul(f[12].c_str(),nullptr,10):10u});
+            if(f.size()!=10&&f.size()!=11&&f.size()!=13&&f.size()!=14&&f.size()!=15){LOGE("invalid --svc record");return 2;}
+            cli_services.push_back({f[7],f[8],f[9],f.size()>=11?f[10]:"",f.size()>=13?f[11]:"",(unsigned)std::strtoul(f[0].c_str(),nullptr,0),(unsigned)std::strtoul(f[1].c_str(),nullptr,0),(unsigned)std::strtoul(f[2].c_str(),nullptr,0),(unsigned)std::strtoul(f[3].c_str(),nullptr,0),(unsigned)std::strtoul(f[4].c_str(),nullptr,0),(unsigned)std::strtoul(f[5].c_str(),nullptr,0),(unsigned)std::strtoul(f[6].c_str(),nullptr,0),f.size()>=13?(unsigned)std::strtoul(f[12].c_str(),nullptr,10):10u,f.size()>=14?(unsigned)std::strtoul(f[13].c_str(),nullptr,10):0u,f.size()==15?(unsigned)std::strtoul(f[14].c_str(),nullptr,10):2u});
         } else if (std::strcmp(argv[i], "--ensemble") == 0 && i + 1 < argc) {
             dab_label_pad(argv[++i], ens_buf);
         } else if (std::strcmp(argv[i], "--ensemble-id") == 0 && i + 1 < argc) {
@@ -1339,10 +1350,10 @@ int main(int argc, char **argv) {
             unsigned vga = (i + 4 < nargs && args[i + 4][0] != '-') ?
                            (unsigned)std::atoi(args[i + 4]) : 0u;
             if(!cli_services.empty()){
-                int n=(int)cli_services.size();std::vector<const char*> ss(n),ls(n),ds(n),sls(n),mf(n);std::vector<int> br(n),co(n),sr(n);std::vector<unsigned> mi(n);std::vector<dab_eep_profile_t> ep(n);std::vector<uint16_t> si(n);std::vector<uint8_t> sc(n),su(n);std::vector<std::array<char,17>> lp(n);
-                for(int k=0;k<n;++k){auto&v=cli_services[k];if(v.codec>2||v.sampling!=32000&&v.sampling!=48000||v.eep> DAB_EEP_4B){LOGE("invalid service format");return 2;}dab_label_pad(v.label.c_str(),lp[k].data());ss[k]=v.source.c_str();ls[k]=lp[k].data();ds[k]=v.dls.c_str();sls[k]=v.short_label.c_str();mf[k]=v.mot_folder.c_str();mi[k]=v.mot_interval;br[k]=(int)v.bitrate;co[k]=(int)v.codec;sr[k]=(int)v.sampling;ep[k]=(dab_eep_profile_t)v.eep;si[k]=(uint16_t)v.sid;sc[k]=(uint8_t)v.scids;su[k]=(uint8_t)v.subch;}
+                int n=(int)cli_services.size();std::vector<const char*> ss(n),ls(n),ds(n),sls(n),mf(n);std::vector<int> br(n),co(n),sr(n),chans(n);std::vector<unsigned> mi(n);std::vector<dab_eep_profile_t> ep(n);std::vector<uint16_t> si(n);std::vector<uint8_t> sc(n),su(n),pt(n);std::vector<std::array<char,17>> lp(n);
+                for(int k=0;k<n;++k){auto&v=cli_services[k];if(v.codec>2||(v.sampling!=32000&&v.sampling!=48000)||v.eep>DAB_EEP_4B||v.pty>31||(v.channels!=1&&v.channels!=2)){LOGE("invalid service format");return 2;}dab_label_pad(v.label.c_str(),lp[k].data());ss[k]=v.source.c_str();ls[k]=lp[k].data();ds[k]=v.dls.c_str();sls[k]=v.short_label.c_str();mf[k]=v.mot_folder.c_str();mi[k]=v.mot_interval;br[k]=(int)v.bitrate;co[k]=(int)v.codec;sr[k]=(int)v.sampling;chans[k]=(int)v.channels;ep[k]=(dab_eep_profile_t)v.eep;si[k]=(uint16_t)v.sid;sc[k]=(uint8_t)v.scids;su[k]=(uint8_t)v.subch;pt[k]=(uint8_t)v.pty;}
                 if(ensemble_id>0xffff||ensemble_ecc>0xff){LOGE("invalid ensemble identity");return 2;}
-                return cmd_tx(ss.data(),n,br.data(),co.data(),sr.data(),ep.data(),si.data(),sc.data(),su.data(),ch,sec,vga,amp_api_flag,(uint16_t)ensemble_id,(uint8_t)ensemble_ecc,ens_buf,ls.data(),ds.data(),sls.data(),slide_path,mf.data(),mi.data(),epg,spi);
+                return cmd_tx(ss.data(),n,br.data(),co.data(),sr.data(),chans.data(),ep.data(),si.data(),sc.data(),su.data(),pt.data(),ch,sec,vga,amp_api_flag,(uint16_t)ensemble_id,(uint8_t)ensemble_ecc,ens_buf,ls.data(),ds.data(),sls.data(),slide_path,mf.data(),mi.data(),epg,spi);
             }
             int n_svcs;
             const char *sources[2];
@@ -1366,7 +1377,7 @@ int main(int argc, char **argv) {
             if(sid1>0xffff||sid2>0xffff||scids1>15||scids2>15||subch1>63||subch2>63||(n_svcs==2&&(sid1==sid2||subch1==subch2))){LOGE("invalid or duplicate service identity");return 2;}
             int bitrates[2] = {72,72}; dab_eep_profile_t eep[2] = {DAB_EEP_3A,DAB_EEP_3A};
             if(ensemble_id>0xffff||ensemble_ecc>0xff){LOGE("invalid ensemble identity");return 2;}
-            return cmd_tx(sources, n_svcs, bitrates, codecs, sample_rates, eep, service_ids, scids, subchs, ch, sec, vga, amp_api_flag, (uint16_t)ensemble_id, (uint8_t)ensemble_ecc, ens_buf, labels, dls, nullptr,
+            return cmd_tx(sources, n_svcs, bitrates, codecs, sample_rates, nullptr, eep, service_ids, scids, subchs, nullptr, ch, sec, vga, amp_api_flag, (uint16_t)ensemble_id, (uint8_t)ensemble_ecc, ens_buf, labels, dls, nullptr,
                           slide_path, nullptr, nullptr, epg, spi);
         }
         if (a == "--tx-file" && i + 4 < nargs) {

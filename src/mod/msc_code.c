@@ -31,7 +31,7 @@ struct dab_msc_subch {
 
 dab_msc_subch_t *dab_msc_subch_new(int bitrate_kbps, unsigned start_address_cu,
                                    dab_eep_profile_t profile) {
-    if (bitrate_kbps < 32 || bitrate_kbps > 384 ||
+    if (bitrate_kbps < 8 || bitrate_kbps > 384 ||
         (profile > DAB_EEP_4A && bitrate_kbps % 32 != 0) ||
         (profile <= DAB_EEP_4A && bitrate_kbps % 8 != 0)) {
         return NULL;

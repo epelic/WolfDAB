@@ -10,6 +10,7 @@ struct aac_enc {
     AACENC_InfoStruct info;
     int mode;
     int calls_per_sf;  /* 6 for AAC-LC, 3 for HE-AAC v2 */
+    int channels;
 };
 
 static int set_param(HANDLE_AACENCODER h, AACENC_PARAM p, UINT v, const char *name) {
@@ -20,10 +21,12 @@ static int set_param(HANDLE_AACENCODER h, AACENC_PARAM p, UINT v, const char *na
     return 0;
 }
 
-aac_enc_t *aac_enc_open_ex(int mode, int bitrate_bps, int sample_rate) {
+aac_enc_t *aac_enc_open_ex_channels(int mode, int bitrate_bps, int sample_rate, int channels) {
+    if (channels != 1 && channels != 2) return NULL;
     aac_enc_t *e = (aac_enc_t *)calloc(1, sizeof(*e));
     if (!e) return NULL;
     e->mode = mode;
+    e->channels = channels;
 
     /*
      * Module allocation flags for aacEncOpen:
@@ -39,7 +42,7 @@ aac_enc_t *aac_enc_open_ex(int mode, int bitrate_bps, int sample_rate) {
     case DABTX_AAC_MODE_RAW_LC:       /* fall through */
     default:                          enc_modules = 0; break;
     }
-    if (aacEncOpen(&e->h, enc_modules, DABTX_AAC_CHANNELS) != AACENC_OK) {
+    if (aacEncOpen(&e->h, enc_modules, (UINT)channels) != AACENC_OK) {
         LOGE("fdk-aac: aacEncOpen failed");
         free(e); return NULL;
     }
@@ -84,7 +87,7 @@ aac_enc_t *aac_enc_open_ex(int mode, int bitrate_bps, int sample_rate) {
 
     ok |= set_param(e->h, AACENC_AOT,            aot,               "AOT");
     ok |= set_param(e->h, AACENC_SAMPLERATE,     sample_rate,       "SAMPLERATE");
-    ok |= set_param(e->h, AACENC_CHANNELMODE,    MODE_2,            "CHANNELMODE");
+    ok |= set_param(e->h, AACENC_CHANNELMODE,    channels == 1 ? MODE_1 : MODE_2, "CHANNELMODE");
     ok |= set_param(e->h, AACENC_CHANNELORDER,   1,                 "CHANNELORDER");
     ok |= set_param(e->h, AACENC_BITRATE,        (UINT)bitrate_bps, "BITRATE");
     ok |= set_param(e->h, AACENC_TRANSMUX,       transmux,          "TRANSMUX");
@@ -109,12 +112,16 @@ aac_enc_t *aac_enc_open_ex(int mode, int bitrate_bps, int sample_rate) {
         aacEncClose(&e->h); free(e); return NULL;
     }
 
-    LOGI("aac: %s %d Hz stereo, %d bps, frameLength=%u, maxOutBufBytes=%u, maxAncBytes=%u, calls/sf=%d",
-         mode_name, sample_rate, bitrate_bps,
+    LOGI("aac: %s %d Hz %s, %d bps, frameLength=%u, maxOutBufBytes=%u, maxAncBytes=%u, calls/sf=%d",
+         mode_name, sample_rate, channels == 1 ? "mono" : "stereo", bitrate_bps,
          (unsigned)e->info.frameLength, (unsigned)e->info.maxOutBufBytes,
          (unsigned)e->info.maxAncBytes, e->calls_per_sf);
 
     return e;
+}
+
+aac_enc_t *aac_enc_open_ex(int mode, int bitrate_bps, int sample_rate) {
+    return aac_enc_open_ex_channels(mode, bitrate_bps, sample_rate, DABTX_AAC_CHANNELS);
 }
 
 aac_enc_t *aac_enc_open(int mode, int bitrate_bps) {
@@ -143,7 +150,7 @@ int aac_enc_frame(aac_enc_t *e,
                   const uint8_t *anc_data, size_t anc_len) {
     if (out_len) *out_len = 0;
 
-    const INT in_samples = DABTX_AAC_GRANULE * DABTX_AAC_CHANNELS;
+    const INT in_samples = DABTX_AAC_GRANULE * e->channels;
 
     /* Input: audio PCM + optional ancillary (PAD) data. */
     INT   in_ids[2]    = { IN_AUDIO_DATA, IN_ANCILLRY_DATA };

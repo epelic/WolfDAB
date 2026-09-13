@@ -38,7 +38,15 @@ int main(void) {
     CHECK(dab_msc_subch_start_byte(s64) == 96, "64 start_byte\n");
 
     /* ---- Invalid bitrates ---- */
-    CHECK(dab_msc_subch_new(24, 0, DAB_EEP_3A) == NULL, "reject 24 kbps\n");
+    dab_msc_subch_t *s24 = dab_msc_subch_new(24, 0, DAB_EEP_3A);
+    CHECK(s24 != NULL, "accept 24 kbps EEP-3A\n");
+    CHECK(dab_msc_subch_in_bytes(s24) == 72 && dab_msc_subch_out_bytes(s24) == 144,
+          "24 kbps geometry\n");
+    dab_msc_subch_free(s24);
+    dab_msc_subch_t *s8 = dab_msc_subch_new(8, 0, DAB_EEP_3A);
+    dab_msc_subch_t *s16 = dab_msc_subch_new(16, 0, DAB_EEP_3A);
+    CHECK(s8 != NULL && s16 != NULL, "accept 8/16 kbps EEP-3A\n");
+    dab_msc_subch_free(s8); dab_msc_subch_free(s16);
     CHECK(dab_msc_subch_new(400, 0, DAB_EEP_3A) == NULL, "reject 400 kbps\n");
     CHECK(dab_msc_subch_new(100, 0, DAB_EEP_3A) == NULL, "reject 100 kbps (not /8)\n");
 

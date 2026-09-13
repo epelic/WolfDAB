@@ -101,7 +101,7 @@ size_t dab_punct_out_bits(const dab_punct_program_t *prog) {
 int dab_eep3a_program(int bitrate_kbps,
                       dab_punct_rule_t rules_out[2],
                       dab_punct_program_t *prog) {
-    if (bitrate_kbps < 32 || bitrate_kbps > 384 || bitrate_kbps % 8 != 0) {
+    if (bitrate_kbps < 8 || bitrate_kbps > 384 || bitrate_kbps % 8 != 0) {
         return -1;
     }
     /* EN 300 401 Table 8, EEP-A level 3:

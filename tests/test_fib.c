@@ -36,6 +36,16 @@ int main(void) {
 
     fib_finalize(&fib);
 
+    fib_reset(&fib);
+    fig0_17_t pty = { .service_id = 0x43E1, .pty = 10 };
+    CHECK(fig0_17_write(&fib, &pty) == 0, "fig0_17_write\n");
+    CHECK(fib.used == 6, "fig0_17 length %zu\n", fib.used);
+    CHECK(fib.bytes[0] == 0x05 && fib.bytes[1] == 0x11,
+          "fig0_17 header %02x %02x\n", fib.bytes[0], fib.bytes[1]);
+    CHECK(fib.bytes[2] == 0x43 && fib.bytes[3] == 0xE1 && fib.bytes[5] == 10,
+          "fig0_17 payload mismatch\n");
+    fib_finalize(&fib);
+
     /* After finalize: bytes 6..29 are 0xFF padding, bytes 30..31 are CRC. */
     for (int i = 6; i < 30; ++i)
         CHECK(fib.bytes[i] == 0xFF, "padding[%d]=0x%02x\n", i, fib.bytes[i]);

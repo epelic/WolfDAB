@@ -40,6 +40,7 @@ typedef struct aac_enc aac_enc_t;
  */
 aac_enc_t *aac_enc_open(int mode, int bitrate_bps);
 aac_enc_t *aac_enc_open_ex(int mode, int bitrate_bps, int sample_rate);
+aac_enc_t *aac_enc_open_ex_channels(int mode, int bitrate_bps, int sample_rate, int channels);
 void       aac_enc_close(aac_enc_t *e);
 
 /* How many aac_enc_frame() calls produce one superframe output.

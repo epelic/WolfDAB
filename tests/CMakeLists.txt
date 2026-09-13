@@ -105,3 +105,7 @@ add_test(NAME spi COMMAND test_spi)
 add_executable(test_source test_source.cpp)
 target_link_libraries(test_source PRIVATE dabtx_audio)
 add_test(NAME source COMMAND test_source)
+
+add_executable(test_aac_lowrate test_aac_lowrate.c)
+target_link_libraries(test_aac_lowrate PRIVATE dabtx_encoder)
+add_test(NAME aac_lowrate COMMAND test_aac_lowrate)
