@@ -64,7 +64,7 @@ target_include_directories(dabtx_pad PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(dabtx main.cpp)
 target_link_libraries(dabtx PRIVATE
-    dabtx_radio dabtx_audio dabtx_encoder dabtx_dabplus dabtx_mux dabtx_mod dabtx_pad fec_rs
+    dabtx_radio dabtx_audio dabtx_encoder dabtx_dabplus dabtx_mux dabtx_mod dabtx_pad fec_rs PkgConfig::TWOLAME
 )
 
 # Native light-theme Windows control room.  The transmission engine remains a

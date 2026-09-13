@@ -45,6 +45,7 @@ pkg_check_modules(FDKAAC   REQUIRED IMPORTED_TARGET fdk-aac)
 pkg_check_modules(FFTW3F   REQUIRED IMPORTED_TARGET fftw3f)
 pkg_check_modules(PORTAUDIO REQUIRED IMPORTED_TARGET portaudio-2.0)
 pkg_check_modules(SNDFILE  REQUIRED IMPORTED_TARGET sndfile)
+pkg_check_modules(TWOLAME  REQUIRED IMPORTED_TARGET twolame)
 
 # Warnings
 if(CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_C_COMPILER_ID STREQUAL "Clang")

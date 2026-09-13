@@ -109,3 +109,7 @@ add_test(NAME source COMMAND test_source)
 add_executable(test_aac_lowrate test_aac_lowrate.c)
 target_link_libraries(test_aac_lowrate PRIVATE dabtx_encoder)
 add_test(NAME aac_lowrate COMMAND test_aac_lowrate)
+
+add_executable(test_mp2 test_mp2.c)
+target_link_libraries(test_mp2 PRIVATE PkgConfig::TWOLAME)
+add_test(NAME mp2 COMMAND test_mp2)

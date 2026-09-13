@@ -16,7 +16,7 @@
 #include "mux/eep_profile.h"
 
 namespace {
-constexpr const wchar_t* APP_VERSION=L"1.0.14";
+constexpr const wchar_t* APP_VERSION=L"1.0.15";
 constexpr int ID_LANG=100, ID_ADD=101, ID_REMOVE=102, ID_START=103, ID_STOP=104, ID_BROWSE=105, ID_APPLY_FORMAT=106;
 constexpr int ID_ENSEMBLE=110, ID_EID=111, ID_ECC=112, ID_CHANNEL=113, ID_GAIN=114, ID_AMP=115;
 constexpr int ID_SERVICE=120, ID_SID=121, ID_SOURCE=122, ID_BITRATE=123, ID_EEP=124, ID_DLS=125, ID_CODEC=126, ID_SAMPLING=127;
@@ -61,7 +61,7 @@ void populateList() {
     for (size_t i=0;i<services.size();++i) { auto& s=services[i]; wchar_t cu[32], rate[32];
         swprintf(cu,32,L"%u",dab_eep_cu_for_bitrate(s.bitrate,s.eep)); swprintf(rate,32,L"%u kbps",s.bitrate);
         LVITEMW x{}; x.mask=LVIF_TEXT; x.iItem=(int)i; x.pszText=s.label.data(); ListView_InsertItem(list,&x);
-        const wchar_t* codec=s.codec==0?L"AAC-LC":s.codec==2?L"HE-AAC v2":L"HE-AAC v1";wchar_t sampling[32];swprintf(sampling,32,L"%u kHz",s.sampling/1000);
+        const wchar_t* codec=s.codec==0?L"AAC-LC":s.codec==2?L"HE-AAC v2":s.codec==3?L"DAB MP2":L"HE-AAC v1";wchar_t sampling[32];swprintf(sampling,32,L"%u kHz",s.sampling/1000);
         ListView_SetItemText(list,(int)i,1,s.sid.data()); ListView_SetItemText(list,(int)i,2,rate);ListView_SetItemText(list,(int)i,3,(LPWSTR)codec);ListView_SetItemText(list,(int)i,4,sampling);
         std::wstring p; for(int k=0;k<8;k++) if(s.eep==(dab_eep_profile_t)k) { const char* a=dab_eep_profile_name((dab_eep_profile_t)k); p.assign(a,a+strlen(a)); }
         wchar_t pty[16];swprintf(pty,16,L"%u",s.pty);ListView_SetItemText(list,(int)i,5,p.data()); ListView_SetItemText(list,(int)i,6,cu);ListView_SetItemText(list,(int)i,7,pty);ListView_SetItemText(list,(int)i,8,(LPWSTR)(s.channels==1?L"Mono":L"Stereo"));
@@ -94,7 +94,7 @@ void saveSelected(bool refresh=true) {
     s.motFolder=text(editMotFolder);try{s.motInterval=std::max(1u,(unsigned)std::stoul(text(editMotInterval)));}catch(...){s.motInterval=10;}
     wchar_t*end=nullptr;std::wstring subText=text(editSubch);unsigned long sub=wcstoul(subText.c_str(),&end,10);if(end&&end!=subText.c_str()&&*end==0&&sub<=63)s.subch=(unsigned)sub;
     int type=(int)SendMessageW(comboSource,CB_GETCURSEL,0,0);const wchar_t* prefix=type==1?L"tone:":type==2?L"file:":type==3?L"stream:":L"device:";s.source=prefix+text(editSource);
-    try{s.bitrate=(unsigned)std::stoul(text(editRate));}catch(...){s.bitrate=0;}s.codec=(unsigned)SendMessageW(comboCodec,CB_GETCURSEL,0,0);s.sampling=SendMessageW(comboSampling,CB_GETCURSEL,0,0)==0?32000:48000;int p=(int)SendMessageW(comboEep,CB_GETCURSEL,0,0);if(p>=0)s.eep=(dab_eep_profile_t)p;int pt=(int)SendMessageW(comboPty,CB_GETCURSEL,0,0);if(pt>=0)s.pty=(unsigned)pt;s.channels=SendMessageW(comboChannels,CB_GETCURSEL,0,0)==0?1u:2u;
+    try{s.bitrate=(unsigned)std::stoul(text(editRate));}catch(...){s.bitrate=0;}s.codec=(unsigned)SendMessageW(comboCodec,CB_GETCURSEL,0,0);s.sampling=s.codec==3?48000:(SendMessageW(comboSampling,CB_GETCURSEL,0,0)==0?32000:48000);if(s.codec==3)SendMessageW(comboSampling,CB_SETCURSEL,1,0);int p=(int)SendMessageW(comboEep,CB_GETCURSEL,0,0);if(p>=0)s.eep=(dab_eep_profile_t)p;int pt=(int)SendMessageW(comboPty,CB_GETCURSEL,0,0);if(pt>=0)s.pty=(unsigned)pt;s.channels=SendMessageW(comboChannels,CB_GETCURSEL,0,0)==0?1u:2u;
     if(refresh){populateList();ListView_SetItemState(list,i,LVIS_SELECTED,LVIS_SELECTED);}
 }
 void createLabel(const wchar_t* s,int x,int y,int w=120) { CreateWindowW(L"STATIC",s,WS_CHILD|WS_VISIBLE,x,y,w,20,wnd,0,0,0); }
@@ -146,7 +146,7 @@ createLabel(tr(L"Ensemble",L"Ensemble"),16,480);createLabel(tr(L"Etichetta",L"La
 void info(){std::wstring message=L"WolfDAB ";message+=APP_VERSION;message+=L"\nDAB/DAB+ multiplex controller for HackRF One\n\n© Freewaves.it\nEmanuele Pelicioli\nmax@freewaves.it\n\nNative Windows x64 • Mode I • 2.048 MS/s\n\nTransmit only where authorised.";std::wstring title=L"WolfDAB ";title+=APP_VERSION;MessageBoxW(wnd,message.c_str(),title.c_str(),MB_OK|MB_ICONINFORMATION);}
 LRESULT CALLBACK proc(HWND h,UINT m,WPARAM w,LPARAM l){
  switch(m){
- case WM_CREATE:wnd=h;windowBrush=CreateSolidBrush(RGB(248,249,251));accentBrush=CreateSolidBrush(RGB(158,235,55));{BOOL dark=FALSE;DwmSetWindowAttribute(h,20,&dark,sizeof(dark));DWORD corner=2;DwmSetWindowAttribute(h,33,&corner,sizeof(corner));}addMenus();createUi();if(startupConfig.empty())startupConfig=readLastConfig();if(!startupConfig.empty()){configPath=startupConfig;loadConfig(configPath);}refreshLanguage();EnableWindow(GetDlgItem(h,ID_STOP),FALSE);return 0;
+ case WM_CREATE:wnd=h;windowBrush=CreateSolidBrush(RGB(248,249,251));accentBrush=CreateSolidBrush(RGB(158,235,55));{BOOL dark=FALSE;DwmSetWindowAttribute(h,20,&dark,sizeof(dark));DWORD corner=2;DwmSetWindowAttribute(h,33,&corner,sizeof(corner));}addMenus();createUi();SendMessageW(comboCodec,CB_ADDSTRING,0,(LPARAM)L"DAB MP2");if(startupConfig.empty())startupConfig=readLastConfig();if(!startupConfig.empty()){configPath=startupConfig;loadConfig(configPath);}refreshLanguage();EnableWindow(GetDlgItem(h,ID_STOP),FALSE);return 0;
  case WM_CTLCOLORSTATIC:{HDC dc=(HDC)w;SetBkMode(dc,TRANSPARENT);if(GetDlgCtrlID((HWND)l)==ID_ACCENT)return(LRESULT)accentBrush;return(LRESULT)windowBrush;}
  case WM_NOTIFY:if(((LPNMHDR)l)->hwndFrom==list&&((LPNMHDR)l)->code==NM_CLICK){auto*n=(NMITEMACTIVATE*)l;if(n->iItem>=0&&n->iItem!=selectedService){saveSelected(false);selectedService=n->iItem;loadSelected();}}break;
  case WM_TIMER:if(txProcess&&!txRunning())stopTx();else status();return 0;
@@ -164,4 +164,4 @@ LRESULT CALLBACK proc(HWND h,UINT m,WPARAM w,LPARAM l){
  return DefWindowProcW(h,m,w,l);
 }
 }
-int WINAPI wWinMain(HINSTANCE i,HINSTANCE, PWSTR cmd,int){instance=i;if(cmd&&wcsncmp(cmd,L"--config",8)==0){const wchar_t*p=cmd+8;while(*p==L' ')++p;if(*p==L'\"'){++p;const wchar_t*e=wcschr(p,L'\"');startupConfig.assign(p,e?e:p+wcslen(p));}else startupConfig=p;}WNDCLASSW c{};c.hInstance=i;c.lpszClassName=L"WolfDAB";c.lpfnWndProc=proc;c.hCursor=LoadCursor(nullptr,IDC_ARROW);c.hIcon=LoadIconW(i,MAKEINTRESOURCEW(101));c.hbrBackground=(HBRUSH)(COLOR_WINDOW+1);if(!RegisterClassW(&c)&&GetLastError()!=ERROR_CLASS_ALREADY_EXISTS)return 1;constexpr DWORD style=WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX|WS_VISIBLE;HWND h=CreateWindowW(c.lpszClassName,L"WolfDAB 1.0.14",style,50,35,1300,700,nullptr,nullptr,i,nullptr);if(!h)return 2;MSG m;while(GetMessageW(&m,nullptr,0,0)){TranslateMessage(&m);DispatchMessageW(&m);}return 0;}
+int WINAPI wWinMain(HINSTANCE i,HINSTANCE, PWSTR cmd,int){instance=i;if(cmd&&wcsncmp(cmd,L"--config",8)==0){const wchar_t*p=cmd+8;while(*p==L' ')++p;if(*p==L'\"'){++p;const wchar_t*e=wcschr(p,L'\"');startupConfig.assign(p,e?e:p+wcslen(p));}else startupConfig=p;}WNDCLASSW c{};c.hInstance=i;c.lpszClassName=L"WolfDAB";c.lpfnWndProc=proc;c.hCursor=LoadCursor(nullptr,IDC_ARROW);c.hIcon=LoadIconW(i,MAKEINTRESOURCEW(101));c.hbrBackground=(HBRUSH)(COLOR_WINDOW+1);if(!RegisterClassW(&c)&&GetLastError()!=ERROR_CLASS_ALREADY_EXISTS)return 1;constexpr DWORD style=WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX|WS_VISIBLE;HWND h=CreateWindowW(c.lpszClassName,L"WolfDAB 1.0.15",style,50,35,1300,700,nullptr,nullptr,i,nullptr);if(!h)return 2;MSG m;while(GetMessageW(&m,nullptr,0,0)){TranslateMessage(&m);DispatchMessageW(&m);}return 0;}

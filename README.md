@@ -5,6 +5,7 @@
 WolfDAB è un trasmettitore multiplex DAB/DAB+ multi-servizio per Windows 10/11 x64 e HackRF One. Include una GUI nativa, fino a 64 servizi entro 864 CU, FIC/MSC, modulazione COFDM Mode I a 2,048 MS/s e uscita diretta libhackrf.
 
 - Audio locale/WASAPI, tono e stream HTTP/HTTPS tramite FFmpeg
+- DAB+ AAC e DAB classico MP2 per singolo servizio, anche combinati nello stesso ensemble
 - HE-AAC v1/v2, bitrate, sampling ed EEP configurabili con calcolo CU live
 - Service ID, etichetta lunga, etichetta breve DAB e SubCh
 - DLS manuale e titoli ICY automatici; cartella MOT Slideshow per ogni servizio con rotazione temporizzata e aggiornamenti live
@@ -19,6 +20,7 @@ Scaricare `WolfDAB-Setup-x64.exe` da Releases. Usare HackRF con driver WinUSB e 
 WolfDAB is a multi-service DAB/DAB+ multiplex transmitter for Windows 10/11 x64 and HackRF One. It includes a native GUI, up to 64 services within 864 CU, FIC/MSC generation, Mode I COFDM modulation at 2.048 MS/s, and direct libhackrf output.
 
 - Local/WASAPI audio, test tone, and HTTP/HTTPS streams through FFmpeg
+- Per-service DAB+ AAC and classic DAB MP2, including mixed ensembles
 - Configurable HE-AAC v1/v2, bitrate, sampling, and EEP with live CU calculation
 - Service ID, long label, DAB short label, and SubCh
 - Manual DLS and automatic ICY titles; per-service MOT Slideshow folders with timed rotation and live updates
