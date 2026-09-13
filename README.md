@@ -16,7 +16,7 @@ WolfDAB è un trasmettitore multiplex DAB/DAB+ multi-servizio per Windows 10/11 
 - Richiesta codice integrata: nome, email, città/Paese e identificativo pseudonimo vengono inviati a Freewaves.it; nessun dato di pagamento
 - Registrazione e setup in italiano, inglese, tedesco e francese
 
-Scaricare `WolfDAB-Trial-Setup-x64.exe` da Releases. La build Trial non ha scadenza, ma non si avvia finché non viene inserito il codice gratuito richiesto dal modulo interno. Usare HackRF con driver WinUSB e un carico fittizio o impianto autorizzato. Ogni trasmissione RF deve rispettare le norme applicabili.
+Scaricare `WolfDAB-Setup-x64.exe` da Releases. WolfDAB è gratuito e permanente dopo l'attivazione, ma non si avvia finché non viene inserito il codice gratuito richiesto dal modulo interno. Usare HackRF con driver WinUSB e un carico fittizio o impianto autorizzato. Ogni trasmissione RF deve rispettare le norme applicabili.
 
 ## English
 
@@ -33,7 +33,7 @@ WolfDAB is a multi-service DAB/DAB+ multiplex transmitter for Windows 10/11 x64 
 - Built-in code request: name, email, city/country and a pseudonymous machine ID are sent to Freewaves.it; no payment data
 - Registration and installer in Italian, English, German, and French
 
-Download `WolfDAB-Trial-Setup-x64.exe` from Releases. The Trial build does not expire, but it will not start until the free code requested through the built-in form is entered. Use HackRF with the WinUSB driver and a dummy load or authorized RF system. RF transmissions must comply with applicable regulations.
+Download `WolfDAB-Setup-x64.exe` from Releases. WolfDAB is free and permanent after activation, but it will not start until the free code requested through the built-in form is entered. Use HackRF with the WinUSB driver and a dummy load or authorized RF system. RF transmissions must comply with applicable regulations.
 
 ## Build / Compilazione
 
