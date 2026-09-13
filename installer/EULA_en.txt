@@ -1,0 +1,18 @@
+WOLFDAB END USER LICENCE AGREEMENT
+
+Copyright (c) 2026 Freewaves.it - Emanuele Pelicioli
+Contact: max@freewaves.it
+
+1. Licence. WolfDAB is licensed free of charge, not sold. Acceptance authorises use on properly registered machines.
+
+2. Registration. Free registration is mandatory and is not a payment requirement. The request form sends Freewaves.it the user's name, email, a pseudonymous machine-derived identifier and declared location (city and country), solely to handle the request, count active installations, understand their geographical distribution and prevent one code being used on different machines. Data enquiries: max@freewaves.it.
+
+3. Distribution. Code and components covered by the GNU GPL may be copied and redistributed under the GPL terms, including for payment. The WolfDAB name, Freewaves.it logo and official installer may not be used to make a modified copy or commercial service appear endorsed by Freewaves.it. Ownership notices may not be removed and the marks may not be used misleadingly.
+
+4. Ownership. WolfDAB, its name, logo, graphics and original code remain the property of Freewaves.it - Emanuele Pelicioli. Third-party components remain subject to their respective licences listed in the documentation.
+
+5. Radio use. The user alone is responsible for frequencies, power, authorisations, content and compliance with applicable rules. WolfDAB may transmit only where and as legally authorised, or into a suitable dummy load.
+
+6. Warranty and liability. The software is provided "as is", without express or implied warranties, to the extent permitted by law. Freewaves.it and Emanuele Pelicioli are not liable for direct or indirect loss, data loss, interruption, interference, penalties or lost profits arising from use or inability to use the software.
+
+7. Acceptance. By installing, registering or using WolfDAB you accept these terms. If you do not accept them, do not install and remove the software.

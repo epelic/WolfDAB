@@ -70,7 +70,7 @@ target_link_libraries(dabtx PRIVATE
 # Native light-theme Windows control room.  The transmission engine remains a
 # separate process so closing the UI can never leave libhackrf streaming.
 if(WIN32)
-    add_executable(WolfDAB WIN32 wolfdab_win.cpp wolfdab.rc)
-    target_link_libraries(WolfDAB PRIVATE dabtx_audio dabtx_mux comctl32 shell32 dwmapi uxtheme)
+    add_executable(WolfDAB WIN32 wolfdab_win.cpp license_win.cpp wolfdab.rc)
+    target_link_libraries(WolfDAB PRIVATE dabtx_audio dabtx_mux comctl32 shell32 dwmapi uxtheme bcrypt crypt32 winhttp advapi32)
     target_link_options(WolfDAB PRIVATE -municode)
 endif()

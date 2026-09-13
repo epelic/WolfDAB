@@ -12,9 +12,11 @@ WolfDAB è un trasmettitore multiplex DAB/DAB+ multi-servizio per Windows 10/11 
 - DLS manuale e titoli ICY automatici; cartella MOT Slideshow per ogni servizio con rotazione temporizzata e aggiornamenti live
 - Immagini MOT: PNG oppure JPEG JFIF baseline (non JPEG Exif/progressive), massimo 32 KB per file
 - Tutti i blocchi DAB Band III, gain e amplificatore HackRF
-- Configurazioni `.wolfdab`; programma e setup in italiano/inglese
+- Configurazioni `.wolfdab`; registrazione gratuita obbligatoria legata alla macchina
+- Richiesta codice integrata: nome, email, città/Paese e identificativo pseudonimo vengono inviati a Freewaves.it; nessun dato di pagamento
+- Registrazione e setup in italiano, inglese, tedesco e francese
 
-Scaricare `WolfDAB-Setup-x64.exe` da Releases. Usare HackRF con driver WinUSB e un carico fittizio o impianto autorizzato. Ogni trasmissione RF deve rispettare le norme applicabili.
+Scaricare `WolfDAB-Trial-Setup-x64.exe` da Releases. La build Trial non ha scadenza, ma non si avvia finché non viene inserito il codice gratuito richiesto dal modulo interno. Usare HackRF con driver WinUSB e un carico fittizio o impianto autorizzato. Ogni trasmissione RF deve rispettare le norme applicabili.
 
 ## English
 
@@ -27,9 +29,11 @@ WolfDAB is a multi-service DAB/DAB+ multiplex transmitter for Windows 10/11 x64 
 - Manual DLS and automatic ICY titles; per-service MOT Slideshow folders with timed rotation and live updates
 - MOT images: PNG or baseline JFIF JPEG (not Exif/progressive JPEG), maximum 32 KB per file
 - All DAB Band III blocks, HackRF gain, and amplifier control
-- `.wolfdab` configurations; Italian/English application and installer
+- `.wolfdab` configurations; mandatory free machine-bound registration
+- Built-in code request: name, email, city/country and a pseudonymous machine ID are sent to Freewaves.it; no payment data
+- Registration and installer in Italian, English, German, and French
 
-Download `WolfDAB-Setup-x64.exe` from Releases. Use HackRF with the WinUSB driver and a dummy load or authorized RF system. RF transmissions must comply with applicable regulations.
+Download `WolfDAB-Trial-Setup-x64.exe` from Releases. The Trial build does not expire, but it will not start until the free code requested through the built-in form is entered. Use HackRF with the WinUSB driver and a dummy load or authorized RF system. RF transmissions must comply with applicable regulations.
 
 ## Build / Compilazione
 
