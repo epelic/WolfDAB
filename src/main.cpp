@@ -454,6 +454,7 @@ struct svc_pipe {
     int             channels{2};
     twolame_options *mp2{};
     std::vector<uint8_t> mp2_pending;
+    unsigned mp2_cifs_per_frame{1};
     std::vector<std::filesystem::path> mot_files;
     size_t          mot_index{};
     uint64_t        mot_fingerprint{};
@@ -498,9 +499,10 @@ static bool svc_pipe_init(svc_pipe &p, const char *source_spec, int bitrate_kbps
     int actual_codec=codec;
     p.channels = channels;
     if(codec==3){
-        if(sample_rate!=48000){LOGE("DAB MP2 requires 48 kHz");wolfdab_source_close(p.src);p.src=nullptr;return false;}
+        if(sample_rate!=24000&&sample_rate!=48000){LOGE("DAB MP2 requires 24 or 48 kHz");wolfdab_source_close(p.src);p.src=nullptr;return false;}
+        p.mp2_cifs_per_frame=sample_rate==24000?2u:1u;
         p.mp2=twolame_init();
-        if(!p.mp2||twolame_set_in_samplerate(p.mp2,48000)||twolame_set_out_samplerate(p.mp2,48000)||
+        if(!p.mp2||twolame_set_in_samplerate(p.mp2,sample_rate)||twolame_set_out_samplerate(p.mp2,sample_rate)||
            twolame_set_num_channels(p.mp2,channels)||twolame_set_mode(p.mp2,channels==1?TWOLAME_MONO:TWOLAME_STEREO)||
            twolame_set_bitrate(p.mp2,bitrate_kbps)||twolame_set_DAB(p.mp2,1)||
            twolame_set_DAB_xpad_length(p.mp2,PAD_SCHED_XPAD_MAX+2)||twolame_set_error_protection(p.mp2,1)||
@@ -676,9 +678,9 @@ static int svc_pipe_produce_mp2(svc_pipe &p) {
         if(!p.mp2_pending.empty()){
             twolame_set_DAB_scf_crc(p.mp2,p.mp2_pending.data(),(int)p.mp2_pending.size());
             uint8_t xp[PAD_SCHED_XPAD_MAX],f0=0,f1=0;int xl=p.pad?pad_sched_get_xpad(p.pad,xp,sizeof(xp),&f0,&f1):0;
-            if(p.mp2_pending.size()!=p.bytes_per_cif)return -1;
+            if(p.mp2_pending.size()!=p.bytes_per_cif*p.mp2_cifs_per_frame)return -1;
             if(xl>0&&(size_t)xl+2<=p.mp2_pending.size()){size_t off=p.mp2_pending.size()-(size_t)xl-2;memcpy(p.mp2_pending.data()+off,xp,(size_t)xl);p.mp2_pending[p.mp2_pending.size()-2]=f0;p.mp2_pending[p.mp2_pending.size()-1]=f1;}
-            std::array<uint8_t,2048> chunk{};memcpy(chunk.data(),p.mp2_pending.data(),p.bytes_per_cif);p.cif_queue.push_back(chunk);
+            for(unsigned c=0;c<p.mp2_cifs_per_frame;++c){std::array<uint8_t,2048> chunk{};memcpy(chunk.data(),p.mp2_pending.data()+(size_t)c*p.bytes_per_cif,p.bytes_per_cif);p.cif_queue.push_back(chunk);}
         }
         p.mp2_pending=std::move(frame);
     }
@@ -1410,7 +1412,7 @@ int main(int argc, char **argv) {
                            (unsigned)std::atoi(args[i + 4]) : 0u;
             if(!cli_services.empty()){
                 int n=(int)cli_services.size();std::vector<const char*> ss(n),ls(n),ds(n),sls(n),mf(n);std::vector<int> br(n),co(n),sr(n),chans(n);std::vector<unsigned> mi(n);std::vector<dab_eep_profile_t> ep(n);std::vector<uint16_t> si(n);std::vector<uint8_t> sc(n),su(n),pt(n);std::vector<std::array<char,17>> lp(n);
-                for(int k=0;k<n;++k){auto&v=cli_services[k];if(v.codec>3||(v.sampling!=32000&&v.sampling!=48000)||(v.codec==3&&v.sampling!=48000)||v.eep>DAB_EEP_4B||v.pty>31||(v.channels!=1&&v.channels!=2)){LOGE("invalid service format");return 2;}dab_label_pad(v.label.c_str(),lp[k].data());ss[k]=v.source.c_str();ls[k]=lp[k].data();ds[k]=v.dls.c_str();sls[k]=v.short_label.c_str();mf[k]=v.mot_folder.c_str();mi[k]=v.mot_interval;br[k]=(int)v.bitrate;co[k]=(int)v.codec;sr[k]=(int)v.sampling;chans[k]=(int)v.channels;ep[k]=(dab_eep_profile_t)v.eep;si[k]=(uint16_t)v.sid;sc[k]=(uint8_t)v.scids;su[k]=(uint8_t)v.subch;pt[k]=(uint8_t)v.pty;}
+                for(int k=0;k<n;++k){auto&v=cli_services[k];bool sampling_ok=v.codec==3?(v.sampling==24000||v.sampling==48000):(v.sampling==32000||v.sampling==48000);if(v.codec>3||!sampling_ok||v.eep>DAB_EEP_4B||v.pty>31||(v.channels!=1&&v.channels!=2)){LOGE("invalid service format");return 2;}dab_label_pad(v.label.c_str(),lp[k].data());ss[k]=v.source.c_str();ls[k]=lp[k].data();ds[k]=v.dls.c_str();sls[k]=v.short_label.c_str();mf[k]=v.mot_folder.c_str();mi[k]=v.mot_interval;br[k]=(int)v.bitrate;co[k]=(int)v.codec;sr[k]=(int)v.sampling;chans[k]=(int)v.channels;ep[k]=(dab_eep_profile_t)v.eep;si[k]=(uint16_t)v.sid;sc[k]=(uint8_t)v.scids;su[k]=(uint8_t)v.subch;pt[k]=(uint8_t)v.pty;}
                 if(ensemble_id>0xffff||ensemble_ecc>0xff){LOGE("invalid ensemble identity");return 2;}
                 return cmd_tx(ss.data(),n,br.data(),co.data(),sr.data(),chans.data(),ep.data(),si.data(),sc.data(),su.data(),pt.data(),ch,sec,vga,amp_api_flag,(uint16_t)ensemble_id,(uint8_t)ensemble_ecc,ens_buf,ls.data(),ds.data(),sls.data(),slide_path,mf.data(),mi.data(),epg,spi);
             }
