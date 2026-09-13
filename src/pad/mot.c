@@ -25,6 +25,19 @@
 #define MOT_MAX_DG_SIZE    1024  /* max MSC data group size */
 #define MOT_MAX_DGS        300   /* max data groups (header + body segs) */
 
+/* Normalise EXIF-only JPEG cover art to JFIF in memory for MOT receivers. */
+static int ensure_jpeg_jfif(uint8_t **data, size_t *len) {
+    static const uint8_t app0[] = {0xFF,0xE0,0x00,0x10,'J','F','I','F',0x00,
+        0x01,0x01,0x00,0x00,0x01,0x00,0x01,0x00,0x00};
+    if(!data||!*data||!len||*len<2||(*data)[0]!=0xFF||(*data)[1]!=0xD8)return -1;
+    size_t scan=*len<4096?*len:4096;
+    for(size_t i=2;i+9<=scan;++i)if((*data)[i]==0xFF&&(*data)[i+1]==0xE0&&memcmp(*data+i+4,"JFIF\0",5)==0)return 0;
+    if(*len+sizeof(app0)>MOT_MAX_IMAGE_SIZE)return -1;
+    uint8_t *next=(uint8_t*)malloc(*len+sizeof(app0));if(!next)return -1;
+    memcpy(next,*data,2);memcpy(next+2,app0,sizeof(app0));memcpy(next+2+sizeof(app0),*data+2,*len-2);
+    free(*data);*data=next;*len+=sizeof(app0);LOGI("mot: EXIF JPEG normalised to JFIF");return 1;
+}
+
 /* CI Length-Index → subfield size table (same as dls.c). */
 static const int ci_sizes[] = { 4, 6, 8, 12, 16, 24, 32, 48 };
 
@@ -237,18 +250,20 @@ mot_enc_t *mot_enc_new(const char *image_path, const char *content_name,
         LOGE("mot: file too large or empty (%ld bytes, max %d)", fsize, MOT_MAX_IMAGE_SIZE);
         fclose(f); return NULL;
     }
-    uint8_t *img = (uint8_t *)malloc((size_t)fsize);
+    size_t img_size=(size_t)fsize;
+    uint8_t *img = (uint8_t *)malloc(img_size);
     if (!img) { fclose(f); return NULL; }
-    if (fread(img, 1, (size_t)fsize, f) != (size_t)fsize) {
+    if (fread(img, 1, img_size, f) != img_size) {
         LOGE("mot: read error"); free(img); fclose(f); return NULL;
     }
     fclose(f);
 
-    mot_enc_t *e = mot_enc_build(img, (size_t)fsize, content_name,
+    if(ctype==0x02&&csubtype==0x01&&ensure_jpeg_jfif(&img,&img_size)<0){LOGE("mot: invalid JPEG/JFIF image");free(img);return NULL;}
+
+    mot_enc_t *e = mot_enc_build(img, img_size, content_name,
                                  ctype, csubtype, transport_id);
     if (e)
-        LOGI("mot: %s loaded, %ld bytes, %d DGs",
-             image_path, fsize, e->n_dgs);
+        LOGI("mot: %s loaded, %zu bytes, %d DGs",image_path,img_size,e->n_dgs);
     free(img);
     return e;
 }
