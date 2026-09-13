@@ -71,6 +71,17 @@ int fig0_9_write(fib_t *fib, uint8_t ecc) {
     return 0;
 }
 
+int fig0_10_write(fib_t *fib, const fig0_10_t *f) {
+    if (!f || f->mjd > 99999u || f->hour > 23u || f->minute > 59u) return -1;
+    uint8_t *p=fib_alloc(fib,6);if(!p)return -1;
+    /* EN 300 401 FIG 0/10 short UTC form: Rfu(1), MJD(17), LSI(1),
+     * ConfInd(1), UTC flag=0(1), hours(5), minutes(6). */
+    uint32_t v=((f->mjd&0x1FFFFu)<<14)|((uint32_t)f->hour<<6)|f->minute;
+    p[0]=fig0_header_byte0(5);p[1]=fig0_header_byte1(10);
+    p[2]=(uint8_t)(v>>24);p[3]=(uint8_t)(v>>16);p[4]=(uint8_t)(v>>8);p[5]=(uint8_t)v;
+    return 0;
+}
+
 int fig0_1_eep_write(fib_t *fib, const fig0_1_eep_t *f) {
     /* 6 bytes total: 2 FIG0 header + 4 subchannel long-form body.
      *   byte 0 FIG header:  type=0, length=5 (1 flags byte + 4 body)

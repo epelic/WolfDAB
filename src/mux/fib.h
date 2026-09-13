@@ -62,6 +62,15 @@ typedef struct {
 int fig0_0_write(fib_t *fib, const fig0_0_t *f);
 int fig0_9_write(fib_t *fib, uint8_t ecc);
 
+/* ---- FIG 0/10: Date and time (UTC, short form) ------------------------- */
+typedef struct {
+    uint32_t mjd;                /* Modified Julian Date, 0..99999 */
+    uint8_t hour;                /* UTC, 0..23 */
+    uint8_t minute;              /* UTC, 0..59 */
+} fig0_10_t;
+
+int fig0_10_write(fib_t *fib, const fig0_10_t *f);
+
 /* ---- FIG 0/1: Basic sub-channel organization (EEP long form) ----------- */
 
 typedef struct {

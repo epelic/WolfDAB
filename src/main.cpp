@@ -35,6 +35,7 @@
 #include <filesystem>
 #include <string>
 #include <thread>
+#include <ctime>
 #include <vector>
 #include <windows.h>
 
@@ -261,7 +262,7 @@ static void build_fic_frame(uint8_t *fics /* 96 bytes */, uint32_t frame_count,
     for(int i=first;i<n_svcs&&i<first+4;++i){fig0_2_audio_t f={.service_id=svcs[i].service_id,.ca_id=0,.local_flag=0,.asc_type=63,.sub_ch_id=svcs[i].sub_ch_id};fig0_2_audio_write(&fib,&f);}
     fib_finalize(&fib);std::memcpy(fics+32,fib.bytes,32);
     fib_reset(&fib);
-    const unsigned carousel=(unsigned)(frame_count%4u);
+    const unsigned carousel=(unsigned)(frame_count%5u);
     if(carousel==0){
         fig0_9_write(&fib,ecc);
         for(int i=first;i<n_svcs&&i<first+4;++i){fig0_8_audio_t f={.service_id=svcs[i].service_id,.sc_ids=svcs[i].sc_ids,.sub_ch_id=svcs[i].sub_ch_id};fig0_8_audio_write(&fib,&f);}
@@ -281,9 +282,14 @@ static void build_fic_frame(uint8_t *fics /* 96 bytes */, uint32_t frame_count,
             for(int i=0;i<n_svcs&&written<3;++i)if(svcs[i].mot_slideshow){if(skip){--skip;continue;}fig0_13_app_t f={.service_id=svcs[i].service_id,.sc_ids=svcs[i].sc_ids,.ua_type=0x002,.ua_data={0x0C,0x3C},.ua_data_len=2};if(fig0_13_write(&fib,&f)==0)++written;}
         }
     }
-    else {
+    else if(carousel==3) {
         int first17=(int)(((frame_count/4u)%((unsigned)(n_svcs+4)/5u))*5u);
         for(int i=first17;i<n_svcs&&i<first17+5;++i){fig0_17_t f={.service_id=svcs[i].service_id,.pty=svcs[i].pty};fig0_17_write(&fib,&f);}
+    }
+    else {
+        std::time_t now=std::time(nullptr);std::tm utc{};gmtime_s(&utc,&now);
+        fig0_10_t f={.mjd=(uint32_t)(now/86400+40587),.hour=(uint8_t)utc.tm_hour,.minute=(uint8_t)utc.tm_min};
+        fig0_10_write(&fib,&f);
     }
     fib_finalize(&fib);std::memcpy(fics+64,fib.bytes,32);
 }

@@ -37,6 +37,19 @@ int main(void) {
     fib_finalize(&fib);
 
     fib_reset(&fib);
+    fig0_10_t dt = { .mjd = 60000, .hour = 23, .minute = 59 };
+    CHECK(fig0_10_write(&fib,&dt)==0,"fig0_10_write\n");
+    CHECK(fib.used==6 && fib.bytes[0]==0x05 && fib.bytes[1]==0x0A,
+          "fig0_10 header\n");
+    uint32_t dt_word=((uint32_t)fib.bytes[2]<<24)|((uint32_t)fib.bytes[3]<<16)|
+                     ((uint32_t)fib.bytes[4]<<8)|fib.bytes[5];
+    CHECK((dt_word>>14)==60000 && ((dt_word>>6)&31)==23 && (dt_word&63)==59,
+          "fig0_10 UTC payload\n");
+    CHECK(fig0_10_write(&fib,&(fig0_10_t){.mjd=100000,.hour=0,.minute=0})<0,
+          "fig0_10 invalid MJD accepted\n");
+    fib_finalize(&fib);
+
+    fib_reset(&fib);
     fig0_17_t pty = { .service_id = 0x43E1, .pty = 10 };
     CHECK(fig0_17_write(&fib, &pty) == 0, "fig0_17_write\n");
     CHECK(fib.used == 6, "fig0_17 length %zu\n", fib.used);
