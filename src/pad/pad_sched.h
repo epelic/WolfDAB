@@ -36,7 +36,12 @@ void pad_sched_set_epg(pad_sched_t *s, epg_t *epg);
 void pad_sched_set_spi(pad_sched_t *s, spi_enc_t *spi);
 void pad_sched_set_dls(pad_sched_t *s, const char *text);
 int pad_sched_set_slide(pad_sched_t *s, const char *image_path,
-                         const char *content_name, uint16_t transport_id);
+                        const char *content_name, uint16_t transport_id);
+
+/* Select whether the currently loaded slide is restarted automatically.
+ * Folder carousels disable this: their owner loads the next image after the
+ * current object has completed and the configured interval has elapsed. */
+void pad_sched_set_slide_auto_retx(pad_sched_t *s, int enabled);
 int pad_sched_slide_complete(const pad_sched_t *s);
 
 /* Get next X-PAD + F-PAD.  Automatically interleaves DLS and MOT.

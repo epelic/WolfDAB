@@ -233,8 +233,19 @@ int main(void) {
         CHECK(pad_sched_get_xpad(sched,live_xpad,sizeof(live_xpad),&live_f0,&live_f1)>0,
               "dynamic MOT cycle stopped early\n");
     CHECK(guard<5000,"dynamic MOT cycle did not complete\n");
-    CHECK(pad_sched_get_xpad(sched,live_xpad,sizeof(live_xpad),&live_f0,&live_f1)>0,
-          "dynamic MOT did not restart continuously\n");
+
+    /* A folder carousel must be able to observe completion.  Otherwise the
+     * scheduler restarts the same image forever and the next file is never
+     * selected. */
+    CHECK(pad_sched_set_slide(sched,img_path,"carousel.jpg",78)==0,
+          "carousel MOT image update failed\n");
+    pad_sched_set_slide_auto_retx(sched, 0);
+    guard=0;
+    while (!pad_sched_slide_complete(sched) && guard++ < 5000)
+        CHECK(pad_sched_get_xpad(sched,live_xpad,sizeof(live_xpad),&live_f0,&live_f1)>0,
+              "carousel MOT cycle stopped early\n");
+    CHECK(pad_sched_slide_complete(sched),
+          "carousel slide completion is not observable\n");
     pad_sched_free(sched);
     remove(img_path);
 

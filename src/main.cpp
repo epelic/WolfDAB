@@ -619,6 +619,11 @@ static void svc_pipe_update_mot(svc_pipe &p) {
     const auto& file=p.mot_files[p.mot_index];
     const std::string path=file.string(), name=file.filename().string();
     if (pad_sched_set_slide(p.pad,path.c_str(),name.c_str(),++p.mot_transport_id)==0) {
+        /* The service-level folder carousel, rather than the PAD scheduler,
+         * owns repetition and image advancement.  Leaving automatic repeat
+         * enabled here keeps restarting this same object forever, so
+         * pad_sched_slide_complete() never lets the carousel advance. */
+        pad_sched_set_slide_auto_retx(p.pad,0);
         LOGI("MOT service %u: %s",p.desc.service_id,path.c_str());
         p.mot_index=(p.mot_index+1)%p.mot_files.size();
         p.mot_next_slide=now+std::chrono::seconds(p.mot_interval);

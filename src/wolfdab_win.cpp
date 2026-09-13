@@ -16,7 +16,7 @@
 #include "mux/eep_profile.h"
 
 namespace {
-constexpr const wchar_t* APP_VERSION=L"1.0.11";
+constexpr const wchar_t* APP_VERSION=L"1.0.12";
 constexpr int ID_LANG=100, ID_ADD=101, ID_REMOVE=102, ID_START=103, ID_STOP=104, ID_BROWSE=105, ID_APPLY_FORMAT=106;
 constexpr int ID_ENSEMBLE=110, ID_EID=111, ID_ECC=112, ID_CHANNEL=113, ID_GAIN=114, ID_AMP=115;
 constexpr int ID_SERVICE=120, ID_SID=121, ID_SOURCE=122, ID_BITRATE=123, ID_EEP=124, ID_DLS=125, ID_CODEC=126, ID_SAMPLING=127;
@@ -164,4 +164,4 @@ LRESULT CALLBACK proc(HWND h,UINT m,WPARAM w,LPARAM l){
  return DefWindowProcW(h,m,w,l);
 }
 }
-int WINAPI wWinMain(HINSTANCE i,HINSTANCE, PWSTR cmd,int){instance=i;if(cmd&&wcsncmp(cmd,L"--config",8)==0){const wchar_t*p=cmd+8;while(*p==L' ')++p;if(*p==L'\"'){++p;const wchar_t*e=wcschr(p,L'\"');startupConfig.assign(p,e?e:p+wcslen(p));}else startupConfig=p;}WNDCLASSW c{};c.hInstance=i;c.lpszClassName=L"WolfDAB";c.lpfnWndProc=proc;c.hCursor=LoadCursor(nullptr,IDC_ARROW);c.hIcon=LoadIconW(i,MAKEINTRESOURCEW(101));c.hbrBackground=(HBRUSH)(COLOR_WINDOW+1);if(!RegisterClassW(&c)&&GetLastError()!=ERROR_CLASS_ALREADY_EXISTS)return 1;constexpr DWORD style=WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX|WS_VISIBLE;HWND h=CreateWindowW(c.lpszClassName,L"WolfDAB 1.0.11",style,50,35,1300,700,nullptr,nullptr,i,nullptr);if(!h)return 2;MSG m;while(GetMessageW(&m,nullptr,0,0)){TranslateMessage(&m);DispatchMessageW(&m);}return 0;}
+int WINAPI wWinMain(HINSTANCE i,HINSTANCE, PWSTR cmd,int){instance=i;if(cmd&&wcsncmp(cmd,L"--config",8)==0){const wchar_t*p=cmd+8;while(*p==L' ')++p;if(*p==L'\"'){++p;const wchar_t*e=wcschr(p,L'\"');startupConfig.assign(p,e?e:p+wcslen(p));}else startupConfig=p;}WNDCLASSW c{};c.hInstance=i;c.lpszClassName=L"WolfDAB";c.lpfnWndProc=proc;c.hCursor=LoadCursor(nullptr,IDC_ARROW);c.hIcon=LoadIconW(i,MAKEINTRESOURCEW(101));c.hbrBackground=(HBRUSH)(COLOR_WINDOW+1);if(!RegisterClassW(&c)&&GetLastError()!=ERROR_CLASS_ALREADY_EXISTS)return 1;constexpr DWORD style=WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX|WS_VISIBLE;HWND h=CreateWindowW(c.lpszClassName,L"WolfDAB 1.0.12",style,50,35,1300,700,nullptr,nullptr,i,nullptr);if(!h)return 2;MSG m;while(GetMessageW(&m,nullptr,0,0)){TranslateMessage(&m);DispatchMessageW(&m);}return 0;}

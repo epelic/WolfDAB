@@ -101,6 +101,10 @@ int pad_sched_set_slide(pad_sched_t *s, const char *image_path,
     return 0;
 }
 
+void pad_sched_set_slide_auto_retx(pad_sched_t *s, int enabled) {
+    if (s) s->mot_auto_retx = enabled ? 1 : 0;
+}
+
 int pad_sched_slide_complete(const pad_sched_t *s) {
     return !s || !s->mot || mot_enc_complete(s->mot);
 }
