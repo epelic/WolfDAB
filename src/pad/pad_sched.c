@@ -94,7 +94,7 @@ int pad_sched_set_slide(pad_sched_t *s, const char *image_path,
     if (s->mot) mot_enc_free(s->mot);
     s->mot = next;
     s->mot_active = 1;
-    s->mot_auto_retx = 0;
+    s->mot_auto_retx = 1;
     s->spi_active = 0;
     s->burst_count = 0;
     s->idle_count = 0;
@@ -201,6 +201,12 @@ int pad_sched_get_xpad(pad_sched_t *s,
             s->mot_active = 0;
             s->spi_active = 0;
             s->idle_count = 0;
+            if (s->mot && s->mot_auto_retx) {
+                mot_enc_restart(s->mot);
+                s->mot_active = 1;
+                r = mot_enc_get_xpad(s->mot, xpad_out, xpad_cap, fpad0, fpad1);
+                if (r > 0) { s->burst_count = 1; return r; }
+            }
         } else {
             /* Insert one DLS field, then reset burst counter. */
             s->burst_count = 0;
@@ -214,6 +220,12 @@ int pad_sched_get_xpad(pad_sched_t *s,
             s->mot_active = 0;
             s->spi_active = 0;
             s->idle_count = 0;
+            if (s->mot && s->mot_auto_retx) {
+                mot_enc_restart(s->mot);
+                s->mot_active = 1;
+                r = mot_enc_get_xpad(s->mot, xpad_out, xpad_cap, fpad0, fpad1);
+                if (r > 0) { s->burst_count = 1; return r; }
+            }
         }
     }
 
