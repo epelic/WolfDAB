@@ -703,12 +703,11 @@ static int svc_pipe_produce(svc_pipe &p) {
         LOGI("DLS metadata: %s", p.last_metadata.c_str());
     }
 
-    /* Generate PAD once per superframe.  With TT_DABPLUS the encoder
-     * needs multiple aacEncEncode() calls to fill one superframe (e.g. 3
-     * for HE-AAC v1 SBR).  Only the LAST call actually encodes — earlier
-     * calls just buffer samples and discard ancillary data.  If we called
-     * dls_enc_get_xpad() on every iteration the segment counter would
-     * advance too fast and qt-dab would see out-of-order DLS segments. */
+    /* Generate one PAD field per DAB+ superframe.  FDK receives one AAC AU
+     * per call but emits the complete DAB+ superframe only after all AUs
+     * have arrived.  Feeding the same ancillary payload into every call
+     * creates a DSE in every AU and needlessly steals audio bitrate.  The
+     * payload is therefore supplied only with the final AU. */
     uint8_t xpad[PAD_SCHED_XPAD_MAX];
     uint8_t fpad0 = 0, fpad1 = 0;
     int xpad_len = 0;
@@ -744,6 +743,8 @@ static int svc_pipe_produce(svc_pipe &p) {
     }
 
     size_t sf_out_len = 0;
+    const int calls_per_sf = aac_enc_calls_per_sf(p.enc);
+    int aac_call = 0;
     while (sf_out_len == 0 && !stop_requested()) {
         size_t got = 0;
         /* A DAB ensemble must remain on-air even when a local capture device
@@ -762,17 +763,17 @@ static int svc_pipe_produce(svc_pipe &p) {
         if (stop_requested()) break;
         const int16_t *encoder_pcm=pcm.data();
         if(p.channels==1){for(size_t n=0;n<DABTX_AAC_GRANULE;++n)mono[n]=(int16_t)(((int32_t)pcm[n*2]+(int32_t)pcm[n*2+1])/2);encoder_pcm=mono.data();}
+        const bool final_au = (aac_call + 1 >= calls_per_sf);
         if (aac_enc_frame(p.enc, encoder_pcm,
                           p.sf_raw.data(), p.sf_raw.size(),
-                          &sf_out_len, anc, anc_len) != 0) {
+                          &sf_out_len,
+                          final_au ? anc : NULL,
+                          final_au ? anc_len : 0) != 0) {
             return -1;
         }
+        ++aac_call;
     }
     if (stop_requested()) return -1;
-
-    if (anc_len > 0 && sf_out_len > 0)
-        strip_pad_early_aus(p.sf_raw.data(), sf_out_len);
-
 
     if (dabplus_sf_from_raw(p.sf, p.sf_raw.data(), sf_out_len,
                             p.sf_bytes.data(), p.sf_bytes.size()) != 0) {

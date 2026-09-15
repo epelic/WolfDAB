@@ -3,8 +3,8 @@ IDI_WOLFDAB ICON "../assets/wolfdab.ico"
 1 24 "wolfdab.manifest"
 
 1 VERSIONINFO
- FILEVERSION 1,0,20,0
- PRODUCTVERSION 1,0,20,0
+ FILEVERSION 1,0,21,0
+ PRODUCTVERSION 1,0,21,0
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0x0L
  FILEOS 0x40004L
@@ -17,12 +17,12 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "Freewaves.it"
       VALUE "FileDescription", "WolfDAB DAB/DAB+ Multiplex Transmitter"
-      VALUE "FileVersion", "1.0.20"
+      VALUE "FileVersion", "1.0.21"
       VALUE "InternalName", "WolfDAB"
       VALUE "LegalCopyright", "© Freewaves.it - Emanuele Pelicioli"
       VALUE "OriginalFilename", "WolfDAB.exe"
       VALUE "ProductName", "WolfDAB"
-      VALUE "ProductVersion", "1.0.20"
+      VALUE "ProductVersion", "1.0.21"
     END
   END
   BLOCK "VarFileInfo"
