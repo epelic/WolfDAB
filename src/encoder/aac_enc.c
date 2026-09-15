@@ -9,7 +9,7 @@ struct aac_enc {
     HANDLE_AACENCODER h;
     AACENC_InfoStruct info;
     int mode;
-    int calls_per_sf;  /* 6 for AAC-LC, 3 for HE-AAC v2 */
+    int calls_per_sf;  /* input blocks of 960 PCM samples per channel */
     int channels;
 };
 
@@ -67,13 +67,16 @@ aac_enc_t *aac_enc_open_ex_channels(int mode, int bitrate_bps, int sample_rate, 
     case DABTX_AAC_MODE_DABPLUS_SBR:
         aot      = AOT_DABPLUS_SBR;      /* 136 */
         transmux = TT_DABPLUS;           /* 13  */
-        e->calls_per_sf = sample_rate / 16000;
+        /* FDK's SBR AU is 1920 samples/channel, while this wrapper feeds
+         * 960-sample PCM blocks.  A DAB+ superframe therefore takes six
+         * calls at 48 kHz (four at 32 kHz), just like AAC-LC. */
+        e->calls_per_sf = sample_rate / 8000;
         mode_name = "HE-AACv1 DAB+";
         break;
     case DABTX_AAC_MODE_DABPLUS_PS:
         aot      = AOT_DABPLUS_PS;
         transmux = TT_DABPLUS;
-        e->calls_per_sf = sample_rate / 16000;
+        e->calls_per_sf = sample_rate / 8000;
         mode_name = "HE-AACv2 DAB+";
         break;
     default:

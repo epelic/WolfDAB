@@ -44,7 +44,8 @@ aac_enc_t *aac_enc_open_ex_channels(int mode, int bitrate_bps, int sample_rate, 
 void       aac_enc_close(aac_enc_t *e);
 
 /* How many aac_enc_frame() calls produce one superframe output.
- * RAW_LC / DABPLUS_LC: 6.  DABPLUS_HEv2: 3. */
+ * At 48 kHz every DAB+ mode uses six 960-sample input calls; SBR/PS AUs
+ * are 1920 samples and consequently consume two input calls each. */
 int aac_enc_calls_per_sf(const aac_enc_t *e);
 
 /* True if the encoder emits complete superframe bodies (TT_DABPLUS). */

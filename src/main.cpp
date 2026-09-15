@@ -460,6 +460,7 @@ struct svc_pipe {
     uint64_t        mot_fingerprint{};
     uint16_t        mot_transport_id{10};
     std::chrono::steady_clock::time_point mot_next_scan{}, mot_next_slide{};
+    int             aac_input_phase{}; /* AAC AU phase, persistent across SF output delay */
 };
 
 static std::wstring wide_arg(const char *s) {
@@ -492,6 +493,7 @@ static bool svc_pipe_init(svc_pipe &p, const char *source_spec, int bitrate_kbps
     p.desc.label          = label;
     p.bytes_per_cif       = (size_t)bitrate_kbps * 3u;
     p.sf_produced         = 0;
+    p.aac_input_phase     = 0;
 
     p.src = open_source_spec(source_spec, sample_rate);
     if (!p.src) return false;
@@ -744,7 +746,6 @@ static int svc_pipe_produce(svc_pipe &p) {
 
     size_t sf_out_len = 0;
     const int calls_per_sf = aac_enc_calls_per_sf(p.enc);
-    int aac_call = 0;
     while (sf_out_len == 0 && !stop_requested()) {
         size_t got = 0;
         /* A DAB ensemble must remain on-air even when a local capture device
@@ -763,7 +764,10 @@ static int svc_pipe_produce(svc_pipe &p) {
         if (stop_requested()) break;
         const int16_t *encoder_pcm=pcm.data();
         if(p.channels==1){for(size_t n=0;n<DABTX_AAC_GRANULE;++n)mono[n]=(int16_t)(((int32_t)pcm[n*2]+(int32_t)pcm[n*2+1])/2);encoder_pcm=mono.data();}
-        const bool final_au = (aac_call + 1 >= calls_per_sf);
+        /* FDK outputs one call after its final input AU.  Keep this phase
+         * across produced superframes so the ancillary field is attached to
+         * exactly one encoded AU, including after the initial delay. */
+        const bool final_au = ((p.aac_input_phase + 1) % calls_per_sf) == 0;
         if (aac_enc_frame(p.enc, encoder_pcm,
                           p.sf_raw.data(), p.sf_raw.size(),
                           &sf_out_len,
@@ -771,7 +775,7 @@ static int svc_pipe_produce(svc_pipe &p) {
                           final_au ? anc_len : 0) != 0) {
             return -1;
         }
-        ++aac_call;
+        p.aac_input_phase = (p.aac_input_phase + 1) % calls_per_sf;
     }
     if (stop_requested()) return -1;
 
@@ -1082,6 +1086,7 @@ static int cmd_tx_file(int dev, const char *channel_label, int seconds,
     uint64_t rf_frames   = 0;
     uint64_t sf_produced = 0;
     uint64_t bytes_written = 0;
+    int aac_input_phase = 0;
 
     auto t_start = std::chrono::steady_clock::now();
     auto t_next  = t_start + std::chrono::milliseconds(500);
@@ -1107,8 +1112,11 @@ static int cmd_tx_file(int dev, const char *channel_label, int seconds,
             }
         }
 
-        /* Feed PCM blocks until the encoder emits a complete superframe. */
+        /* Feed PCM blocks until the encoder emits a complete superframe.
+         * As in the live pipeline, ancillary PAD belongs only in the final
+         * AAC AU; passing it on every call needlessly reduces audio bitrate. */
         size_t sf_out_len = 0;
+        const int calls_per_sf = aac_enc_calls_per_sf(enc);
         while (sf_out_len == 0 && !stop_requested()) {
             size_t got = 0;
             while (got < block && !stop_requested()) {
@@ -1120,16 +1128,17 @@ static int cmd_tx_file(int dev, const char *channel_label, int seconds,
                 got += r;
             }
             if (stop_requested()) break;
+            const bool final_au = ((aac_input_phase + 1) % calls_per_sf) == 0;
             if (aac_enc_frame(enc, pcm.data(),
                               sf_raw.data(), sf_raw.size(),
-                              &sf_out_len, anc_p, anc_n) != 0) {
+                              &sf_out_len,
+                              final_au ? anc_p : NULL,
+                              final_au ? anc_n : 0) != 0) {
                 LOGE("encoder error"); goto done;
             }
+            aac_input_phase = (aac_input_phase + 1) % calls_per_sf;
         }
         if (stop_requested()) break;
-
-        if (anc_n > 0 && sf_out_len > 0)
-            strip_pad_early_aus(sf_raw.data(), sf_out_len);
 
         if (dabplus_sf_from_raw(sf, sf_raw.data(), sf_out_len,
                                 sf_bytes.data(), sf_bytes.size()) != 0) {
