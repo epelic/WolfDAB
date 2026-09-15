@@ -619,7 +619,7 @@ static void strip_pad_early_aus(uint8_t *sf, size_t sf_len) {
 }
 
 static void svc_pipe_update_mot(svc_pipe &p) {
-    if (!p.pad || p.mot_folder.empty()) return;
+    if (stop_requested() || !p.pad || p.mot_folder.empty()) return;
     const auto now = std::chrono::steady_clock::now();
     bool changed = false;
     if (now >= p.mot_next_scan) {
@@ -628,6 +628,7 @@ static void svc_pipe_update_mot(svc_pipe &p) {
         uint64_t fingerprint = 1469598103934665603ull;
         try {
             for (const auto& entry : std::filesystem::directory_iterator(p.mot_folder)) {
+                if (stop_requested()) return;
                 if (!entry.is_regular_file()) continue;
                 std::string ext = entry.path().extension().string();
                 std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c){return (char)std::tolower(c);});
@@ -636,6 +637,7 @@ static void svc_pipe_update_mot(svc_pipe &p) {
             }
             std::sort(files.begin(), files.end());
             for (const auto& file : files) {
+                if (stop_requested()) return;
                 const std::string key=file.string();
                 for(unsigned char c:key){fingerprint^=c;fingerprint*=1099511628211ull;}
                 fingerprint^=(uint64_t)std::filesystem::file_size(file);fingerprint*=1099511628211ull;
@@ -845,9 +847,11 @@ static int cmd_tx(const char *const *source_specs, int n_svcs,
         return 1;
     }
 
-    /* Pre-fill TX ring with silence (cold-start fix). */
+    /* Pre-fill only a short lead-in.  The ring itself is deliberately much
+     * larger, so a late audio/FFmpeg worker cannot drain the RF clock. */
     {
-        const size_t prefill = hackrf_tx_writable(tx);
+        const size_t prefill = std::min(hackrf_tx_writable(tx),
+                                        (size_t)DAB_MODE_I_FRAME_SAMPLES * 3u);
         std::vector<std::complex<float>> silence(prefill);
         hackrf_tx_push(tx,
             reinterpret_cast<const float _Complex *>(silence.data()),

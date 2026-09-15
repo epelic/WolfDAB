@@ -13,6 +13,7 @@ endif()
 
 option(DABTX_SANITIZE "Enable ASan/UBSan in Debug builds" OFF)
 option(DABTX_BUILD_TESTS "Build unit tests" ON)
+option(WOLFDAB_OWNER_BUILD "Build WolfDAB without the end-user registration gate" OFF)
 
 # -----------------------------------------------------------------------------
 # MSYS2 UCRT64 hint: ensure pkg-config finds libhackrf/fdk-aac/fftw/portaudio

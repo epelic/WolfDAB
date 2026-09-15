@@ -48,7 +48,13 @@ int hackrf_tx_probe(void) {
 /* Streaming TX                                                       */
 /* ------------------------------------------------------------------ */
 
-#define RING_CAP 524288u          /* 512 ki samples ≈ 256 ms @ 2.048 MS/s */
+/*
+ * Keep two seconds of RF IQ available to the USB callback.  The DAB clock
+ * must never be coupled to an HTTP decoder: a stalled network source is
+ * encoded as silence by the service pipeline, while this reserve absorbs
+ * normal Windows scheduling and USB jitter without dropping the RF carrier.
+ */
+#define RING_CAP 4194304u         /* 4 Mi samples ≈ 2.048 s @ 2.048 MS/s */
 
 struct hackrf_tx {
     hackrf_device    *dev;
@@ -161,8 +167,21 @@ int hackrf_tx_start(hackrf_tx_t *tx) {
 void hackrf_tx_close(hackrf_tx_t *tx) {
     if (!tx) return;
     if (tx->dev) {
-        if (tx->started) hackrf_stop_tx(tx->dev);
-        hackrf_close(tx->dev);
+        if (tx->started) {
+            int r = hackrf_stop_tx(tx->dev);
+            if (r != HACKRF_SUCCESS)
+                LOGE("hackrf_stop_tx: %s", hackrf_error_name(r));
+            tx->started = 0;
+        }
+        /* Explicitly turn the RF amplifier off before dropping the USB
+           handle.  This also makes the shutdown state deterministic. */
+        int r = hackrf_set_amp_enable(tx->dev, 0);
+        if (r != HACKRF_SUCCESS)
+            LOGW("set_amp_off during close: %s", hackrf_error_name(r));
+        r = hackrf_close(tx->dev);
+        if (r != HACKRF_SUCCESS)
+            LOGE("hackrf_close: %s", hackrf_error_name(r));
+        tx->dev = NULL;
     }
     ring_cf_free(&tx->ring);
     hackrf_exit();

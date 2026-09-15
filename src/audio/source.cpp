@@ -15,6 +15,7 @@ struct wolfdab_source {
     uint64_t frames_in{}, frames_dropped{};
     int sample_rate{48000};
     bool network{};
+    ULONGLONG next_restart_ms{};
     std::wstring ffmpeg_exe, media;
     std::string meta_buffer, metadata;
 };
@@ -80,6 +81,18 @@ static void poll_metadata(wolfdab_source_t *s){
 
 const char *wolfdab_source_metadata(wolfdab_source_t*s){poll_metadata(s);return s&&!s->metadata.empty()?s->metadata.c_str():nullptr;}
 
+/* FFmpeg normally reconnects streams itself.  If a server closes it hard and
+ * FFmpeg exits, relaunch it once per second.  This is intentionally called
+ * only after the child has exited, so the real-time DAB path never waits for
+ * a network timeout or for a still-running decoder. */
+static void restart_if_ended(wolfdab_source_t *s) {
+    if(!s || !s->process || WaitForSingleObject(s->process,0)!=WAIT_OBJECT_0)return;
+    ULONGLONG now=GetTickCount64();
+    if(now<s->next_restart_ms)return;
+    s->next_restart_ms=now+1000;
+    if(launch_media(s)) { s->next_restart_ms=0; LOGI("FFmpeg source restarted"); }
+}
+
 size_t wolfdab_source_read(wolfdab_source_t*s,int16_t*dst,size_t samples){
     if(!s||!dst)return 0;
     if(s->kind==WOLFDAB_SOURCE_DEVICE){
@@ -89,7 +102,23 @@ size_t wolfdab_source_read(wolfdab_source_t*s,int16_t*dst,size_t samples){
         size_t produced=0;for(size_t o=0;o<out_frames;++o){size_t k=(o*3)/2;if(k>=frames)break;dst[2*o]=in[2*k];dst[2*o+1]=in[2*k+1];produced+=2;}return produced;
     }
     if(s->kind==WOLFDAB_SOURCE_TONE){for(size_t i=0;i<samples;i+=2){int16_t v=(int16_t)std::lrint(std::sin(s->phase)*s->amplitude);dst[i]=v;if(i+1<samples)dst[i+1]=v;s->phase+=s->step;if(s->phase>=6.2831853071795864769)s->phase-=6.2831853071795864769;}s->frames_in+=samples/2;return samples;}
-    DWORD got=0;BOOL ok=ReadFile(s->pipe,dst,(DWORD)(samples*sizeof(int16_t)),&got,nullptr);if((!ok||!got)&&!s->network){if(!launch_media(s)||!ReadFile(s->pipe,dst,(DWORD)(samples*sizeof(int16_t)),&got,nullptr))return 0;}else if(!ok)return 0;s->frames_in+=got/(2*sizeof(int16_t));return got/sizeof(int16_t);
+    /* Never block the DAB framing thread on an HTTP source.  FFmpeg fills a
+     * pipe asynchronously; if it has no PCM right now, the caller inserts
+     * digital silence for that audio block and the RF clock keeps running.
+     * Blocking ReadFile here was able to empty the HackRF ring when one of a
+     * full 864-CU ensemble briefly stalled or reconnected. */
+    DWORD available=0;
+    if(!PeekNamedPipe(s->pipe,nullptr,0,nullptr,&available,nullptr)) {
+        restart_if_ended(s);
+        return 0;
+    }
+    if(!available) {
+        restart_if_ended(s);
+        return 0;
+    }
+    DWORD want=(DWORD)std::min<size_t>(samples*sizeof(int16_t),available),got=0;
+    if(!ReadFile(s->pipe,dst,want,&got,nullptr)||!got)return 0;
+    s->frames_in+=got/(2*sizeof(int16_t));return got/sizeof(int16_t);
 }
 void wolfdab_source_get_stats(const wolfdab_source_t*s,pa_source_stats_t*out){if(!s||!out)return;if(s->kind==WOLFDAB_SOURCE_DEVICE){pa_source_get_stats(s->device,out);return;}out->frames_in=s->frames_in;out->frames_dropped=s->frames_dropped;out->ring_fill=0;out->ring_capacity=0;}
 void wolfdab_source_close(wolfdab_source_t*s){if(!s)return;if(s->device)pa_source_close(s->device);if(s->pipe)CloseHandle(s->pipe);if(s->meta_pipe)CloseHandle(s->meta_pipe);if(s->process){TerminateProcess(s->process,0);WaitForSingleObject(s->process,1000);CloseHandle(s->process);}delete s;}
