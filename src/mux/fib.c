@@ -60,14 +60,19 @@ int fig0_0_write(fib_t *fib, const fig0_0_t *f) {
     return 0;
 }
 
-int fig0_9_write(fib_t *fib, uint8_t ecc) {
-    /* FIG 0/9: no international table, UTC local-time offset. */
-    uint8_t *p = fib_alloc(fib, 4);
+int fig0_9_write(fib_t *fib, uint8_t ecc, int lto_half_hours) {
+    if (lto_half_hours < -31 || lto_half_hours > 31) return -1;
+    /* EN 300 401 FIG 0/9: Ext=0, Rfa=0, signed LTO in half-hours,
+     * ensemble ECC and International Table Id 1 (European/RDS PTY). */
+    uint8_t *p = fib_alloc(fib, 5);
     if (!p) return -1;
-    p[0] = fig0_header_byte0(3);
+    p[0] = fig0_header_byte0(4);
     p[1] = fig0_header_byte1(9);
-    p[2] = 0x00;
+    p[2] = (uint8_t)(lto_half_hours < 0
+        ? (0x20u | (unsigned)(-lto_half_hours))
+        : (unsigned)lto_half_hours);
     p[3] = ecc;
+    p[4] = 1;
     return 0;
 }
 

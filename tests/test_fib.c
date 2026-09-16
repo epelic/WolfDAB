@@ -37,6 +37,17 @@ int main(void) {
     fib_finalize(&fib);
 
     fib_reset(&fib);
+    CHECK(fig0_9_write(&fib, 0xE0, 4) == 0, "fig0_9 positive LTO\n");
+    CHECK(fib.used == 5 && fib.bytes[0] == 0x04 && fib.bytes[1] == 0x09,
+          "fig0_9 header\n");
+    CHECK(fib.bytes[2] == 4 && fib.bytes[3] == 0xE0 && fib.bytes[4] == 1,
+          "fig0_9 positive payload\n");
+    fib_reset(&fib);
+    CHECK(fig0_9_write(&fib, 0xE1, -7) == 0 && fib.bytes[2] == (0x20 | 7),
+          "fig0_9 negative LTO\n");
+    CHECK(fig0_9_write(&fib, 0xE1, 32) < 0, "fig0_9 invalid LTO accepted\n");
+
+    fib_reset(&fib);
     fig0_10_t dt = { .mjd = 60000, .hour = 23, .minute = 59 };
     CHECK(fig0_10_write(&fib,&dt)==0,"fig0_10_write\n");
     CHECK(fib.used==6 && fib.bytes[0]==0x05 && fib.bytes[1]==0x0A,

@@ -60,7 +60,9 @@ typedef struct {
 } fig0_0_t;
 
 int fig0_0_write(fib_t *fib, const fig0_0_t *f);
-int fig0_9_write(fib_t *fib, uint8_t ecc);
+/* lto_half_hours is the signed local offset from UTC in 30-minute units
+ * (-31..+31). International programme type table 1 is signalled. */
+int fig0_9_write(fib_t *fib, uint8_t ecc, int lto_half_hours);
 
 /* ---- FIG 0/10: Date and time (UTC, short form) ------------------------- */
 typedef struct {

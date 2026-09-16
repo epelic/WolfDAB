@@ -44,6 +44,18 @@
 
 static volatile std::sig_atomic_t g_stop = 0;
 static HANDLE g_stop_event = NULL;
+/* 100 means follow the current Windows time zone, including DST. */
+static int g_lto_half_hours = 100;
+
+static int current_lto_half_hours(void) {
+    if (g_lto_half_hours != 100) return g_lto_half_hours;
+    const std::time_t now = std::time(nullptr);
+    std::tm local_tm{}, utc_tm{};
+    localtime_s(&local_tm, &now);
+    gmtime_s(&utc_tm, &now);
+    const double seconds = std::difftime(_mkgmtime(&local_tm), _mkgmtime(&utc_tm));
+    return std::clamp((int)std::lround(seconds / 1800.0), -31, 31);
+}
 
 static void sigint_handler(int /*sig*/) {
     g_stop = 1;
@@ -266,11 +278,11 @@ static void build_fic_frame(uint8_t *fics /* 96 bytes */, uint32_t frame_count,
     fib_reset(&fib);
     const unsigned carousel=(unsigned)(frame_count%5u);
     if(carousel==0){
-        fig0_9_write(&fib,ecc);
+        fig0_9_write(&fib,ecc,current_lto_half_hours());
         for(int i=first;i<n_svcs&&i<first+4;++i){fig0_8_audio_t f={.service_id=svcs[i].service_id,.sc_ids=svcs[i].sc_ids,.sub_ch_id=svcs[i].sub_ch_id};fig0_8_audio_write(&fib,&f);}
     }
     else if(carousel==1){
-        fig0_9_write(&fib,ecc);
+        fig0_9_write(&fib,ecc,current_lto_half_hours());
         int slot=(int)(((frame_count/4u)%(unsigned)(n_svcs+1)));
         if(slot==0)fig1_0_write(&fib,ensemble_id,ens_label,0);else fig1_1_write(&fib,svcs[slot-1].service_id,svcs[slot-1].label,svcs[slot-1].short_label_flag);
     }
@@ -278,7 +290,7 @@ static void build_fic_frame(uint8_t *fics /* 96 bytes */, uint32_t frame_count,
         /* TS 101 499 requires MOT SlideShow to be announced in FIG 0/13.
          * Audio X-PAD application data: AppTy=12, DG=0, DSCTy=60 (MOT). */
         int mot_count=0;for(int i=0;i<n_svcs;++i)if(svcs[i].mot_slideshow)++mot_count;
-        if(mot_count==0)fig0_9_write(&fib,ecc);
+        if(mot_count==0)fig0_9_write(&fib,ecc,current_lto_half_hours());
         else {
             int page13=(int)((frame_count/4u)%((unsigned)(mot_count+2)/3u));int skip=page13*3,written=0;
             for(int i=0;i<n_svcs&&written<3;++i)if(svcs[i].mot_slideshow){if(skip){--skip;continue;}fig0_13_app_t f={.service_id=svcs[i].service_id,.sc_ids=svcs[i].sc_ids,.ua_type=0x002,.ua_data={0x0C,0x3C},.ua_data_len=2};if(fig0_13_write(&fib,&f)==0)++written;}
@@ -1338,6 +1350,18 @@ int main(int argc, char **argv) {
             ensemble_id = (unsigned)std::strtoul(argv[++i], nullptr, 0);
         } else if (std::strcmp(argv[i], "--ecc") == 0 && i + 1 < argc) {
             ensemble_ecc = (unsigned)std::strtoul(argv[++i], nullptr, 0);
+        } else if (std::strcmp(argv[i], "--lto") == 0 && i + 1 < argc) {
+            const char *value = argv[++i];
+            if (std::strcmp(value, "auto") == 0) g_lto_half_hours = 100;
+            else {
+                char *end = nullptr;
+                long parsed = std::strtol(value, &end, 10);
+                if (!end || end == value || *end || parsed < -31 || parsed > 31) {
+                    LOGE("invalid --lto value (use auto or -31..31 half-hours)");
+                    return 2;
+                }
+                g_lto_half_hours = (int)parsed;
+            }
         } else if (std::strcmp(argv[i], "--service") == 0 && i + 1 < argc) {
             dab_label_pad(argv[++i], svc_buf);
         } else if (std::strcmp(argv[i], "--service2") == 0 && i + 1 < argc) {

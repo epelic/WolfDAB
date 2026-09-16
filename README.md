@@ -14,6 +14,7 @@ WolfDAB è un trasmettitore multiplex DAB/DAB+ multi-servizio per Windows 10/11 
 - DLS manuale e titoli ICY automatici; cartella MOT Slideshow per ogni servizio con rotazione temporizzata e aggiornamenti live
 - Immagini MOT: PNG oppure JPEG JFIF baseline (non JPEG Exif/progressive), massimo 32 KB per file
 - Tutti i blocchi DAB Band III, gain e amplificatore HackRF
+- Data e ora DAB con fuso automatico Windows oppure offset UTC manuale
 - Configurazioni `.wolfdab`; registrazione gratuita obbligatoria legata alla macchina
 - Richiesta codice integrata: nome, email, città/Paese e identificativo pseudonimo vengono inviati a Freewaves.it; nessun dato di pagamento
 - Registrazione e setup in italiano, inglese, tedesco e francese
@@ -35,6 +36,7 @@ WolfDAB is a multi-service DAB/DAB+ multiplex transmitter for Windows 10/11 x64 
 - Manual DLS and automatic ICY titles; per-service MOT Slideshow folders with timed rotation and live updates
 - MOT images: PNG or baseline JFIF JPEG (not Exif/progressive JPEG), maximum 32 KB per file
 - All DAB Band III blocks, HackRF gain, and amplifier control
+- DAB date and time with automatic Windows time zone or manual UTC offset
 - `.wolfdab` configurations; mandatory free machine-bound registration
 - Built-in code request: name, email, city/country and a pseudonymous machine ID are sent to Freewaves.it; no payment data
 - Registration and installer in Italian, English, German, and French
