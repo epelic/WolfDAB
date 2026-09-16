@@ -20,7 +20,7 @@ WolfDAB è un trasmettitore multiplex DAB/DAB+ multi-servizio per Windows 10/11 
 
 Scaricare `WolfDAB-Setup-x64.exe` da Releases. WolfDAB è gratuito e permanente dopo l'attivazione, ma non si avvia finché non viene inserito il codice gratuito richiesto dal modulo interno. Usare HackRF con driver WinUSB e un carico fittizio o impianto autorizzato. Ogni trasmissione RF deve rispettare le norme applicabili.
 
-WolfDAB è stato realizzato da Emanuele Pelicioli — Freewaves.it, anche con l'aiuto di **Guglielmino (ChatGPT)**.
+WolfDAB è stato realizzato da Emanuele Pelicioli — Freewaves.it, con l'aiuto inestimabile di **Guglielmino (ChatGPT)**.
 
 ## English
 
@@ -41,7 +41,7 @@ WolfDAB is a multi-service DAB/DAB+ multiplex transmitter for Windows 10/11 x64 
 
 Download `WolfDAB-Setup-x64.exe` from Releases. WolfDAB is free and permanent after activation, but it will not start until the free code requested through the built-in form is entered. Use HackRF with the WinUSB driver and a dummy load or authorized RF system. RF transmissions must comply with applicable regulations.
 
-WolfDAB was created by Emanuele Pelicioli — Freewaves.it, also with the help of **Guglielmino (ChatGPT)**.
+WolfDAB was created by Emanuele Pelicioli — Freewaves.it, with the invaluable help of **Guglielmino (ChatGPT)**.
 
 ## Build / Compilazione
 
