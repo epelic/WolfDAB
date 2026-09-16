@@ -18,7 +18,7 @@
 #include "license_win.h"
 
 namespace {
-constexpr const wchar_t* APP_VERSION=L"1.0.22";
+constexpr const wchar_t* APP_VERSION=L"1.0.23";
 constexpr int ID_LANG=100, ID_ADD=101, ID_REMOVE=102, ID_START=103, ID_STOP=104, ID_BROWSE=105, ID_APPLY_FORMAT=106;
 constexpr int ID_ENSEMBLE=110, ID_EID=111, ID_ECC=112, ID_CHANNEL=113, ID_GAIN=114, ID_AMP=115;
 constexpr int ID_SERVICE=120, ID_SID=121, ID_SOURCE=122, ID_BITRATE=123, ID_EEP=124, ID_DLS=125, ID_CODEC=126, ID_SAMPLING=127;

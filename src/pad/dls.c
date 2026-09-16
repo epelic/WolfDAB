@@ -108,11 +108,60 @@ void dls_enc_free(dls_enc_t *e) {
     free(e);
 }
 
+/* DLS charset 0 is the broadly-supported EBU Latin alphabet, not UTF-8.
+ * Metadata from HTTP streams is UTF-8, so passing its bytes through makes
+ * accents appear as two garbage characters on ordinary receivers.  Keep the
+ * Western-European repertoire as one byte and use readable replacements for
+ * punctuation outside it. */
+static int dls_utf8_to_ebu_latin(uint8_t *out, int cap, const char *text) {
+    const uint8_t *s = (const uint8_t *)text;
+    int n = 0;
+    while (*s && n < cap) {
+        uint32_t cp;
+        if (s[0] < 0x80) { cp = *s++; }
+        else if ((s[0] & 0xE0) == 0xC0 && (s[1] & 0xC0) == 0x80) {
+            cp = ((uint32_t)(s[0] & 0x1F) << 6) | (s[1] & 0x3F); s += 2;
+        } else if ((s[0] & 0xF0) == 0xE0 && (s[1] & 0xC0) == 0x80 && (s[2] & 0xC0) == 0x80) {
+            cp = ((uint32_t)(s[0] & 0x0F) << 12) | ((uint32_t)(s[1] & 0x3F) << 6) | (s[2] & 0x3F); s += 3;
+        } else { ++s; cp = '?'; }
+        if (cp >= 0x20 && cp <= 0x7F) out[n++] = (uint8_t)cp;
+        /* ETSI TS 101 756 Annex C: EBU Latin is not ISO-8859-1. */
+        else switch (cp) {
+        case 0x00E1: out[n++]=0x80; break; case 0x00E0: out[n++]=0x81; break;
+        case 0x00E9: out[n++]=0x82; break; case 0x00E8: out[n++]=0x83; break;
+        case 0x00ED: out[n++]=0x84; break; case 0x00EC: out[n++]=0x85; break;
+        case 0x00F3: out[n++]=0x86; break; case 0x00F2: out[n++]=0x87; break;
+        case 0x00FA: out[n++]=0x88; break; case 0x00F9: out[n++]=0x89; break;
+        case 0x00D1: out[n++]=0x8A; break; case 0x00C7: out[n++]=0x8B; break;
+        case 0x00DF: out[n++]=0x8D; break;
+        case 0x00E2: out[n++]=0x90; break; case 0x00E4: out[n++]=0x91; break;
+        case 0x00EA: out[n++]=0x92; break; case 0x00EB: out[n++]=0x93; break;
+        case 0x00EE: out[n++]=0x94; break; case 0x00EF: out[n++]=0x95; break;
+        case 0x00F4: out[n++]=0x96; break; case 0x00F6: out[n++]=0x97; break;
+        case 0x00FB: out[n++]=0x98; break; case 0x00FC: out[n++]=0x99; break;
+        case 0x00F1: out[n++]=0x9A; break; case 0x00E7: out[n++]=0x9B; break;
+        case 0x00C1: out[n++]=0xC0; break; case 0x00C0: out[n++]=0xC1; break;
+        case 0x00C9: out[n++]=0xC2; break; case 0x00C8: out[n++]=0xC3; break;
+        case 0x00CD: out[n++]=0xC4; break; case 0x00CC: out[n++]=0xC5; break;
+        case 0x00D3: out[n++]=0xC6; break; case 0x00D2: out[n++]=0xC7; break;
+        case 0x00DA: out[n++]=0xC8; break; case 0x00D9: out[n++]=0xC9; break;
+        case 0x00C2: out[n++]=0xD0; break; case 0x00C4: out[n++]=0xD1; break;
+        case 0x00CA: out[n++]=0xD2; break; case 0x00CB: out[n++]=0xD3; break;
+        case 0x00CE: out[n++]=0xD4; break; case 0x00CF: out[n++]=0xD5; break;
+        case 0x00D4: out[n++]=0xD6; break; case 0x00D6: out[n++]=0xD7; break;
+        case 0x00DB: out[n++]=0xD8; break; case 0x00DC: out[n++]=0xD9; break;
+        case 0x2018: case 0x2019: case 0x201A: out[n++]='\''; break;
+        case 0x201C: case 0x201D: case 0x00AB: case 0x00BB: out[n++]='"'; break;
+        case 0x2013: case 0x2014: case 0x2212: out[n++]='-'; break;
+        default: out[n++]='?'; break;
+        }
+    }
+    return n;
+}
+
 void dls_enc_set_text(dls_enc_t *e, const char *text) {
     if (!e || !text) return;
-    e->text_len = (int)strlen(text);
-    if (e->text_len > DLS_MAX_TEXT) e->text_len = DLS_MAX_TEXT;
-    memcpy(e->text, text, (size_t)e->text_len);
+    e->text_len = dls_utf8_to_ebu_latin(e->text, DLS_MAX_TEXT, text);
     e->toggle ^= 1;
     e->cur_seg = 0;
     build_data_groups(e);
