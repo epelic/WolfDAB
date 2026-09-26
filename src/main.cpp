@@ -266,7 +266,13 @@ static uint16_t short_label_flag(const char *label,const char *short_label){
 static void build_fic_frame(uint8_t *fics /* 96 bytes */, uint32_t frame_count,
                             uint16_t ensemble_id, uint8_t ecc, const char *ens_label,
                             const dab_svc_desc *svcs, int n_svcs) {
-    fib_t fib; int page=(int)(frame_count%4u), first=page*4;
+    fib_t fib;
+    const unsigned pages = (unsigned)(n_svcs + 3) / 4u;
+    const unsigned page = frame_count % pages;
+    const int first = (int)page * 4;
+    const unsigned fic_cycle = frame_count / pages;
+    const unsigned carousel = fic_cycle % 5u;
+    const unsigned supercycle = fic_cycle / 5u;
     fib_reset(&fib);
     fig0_0_t f00={.ensemble_id=ensemble_id,.change_flag=0,.al_flag=0,.cif_count_high=(uint8_t)((frame_count/250u)%20u),.cif_count_low=(uint8_t)(frame_count%250u)};
     fig0_0_write(&fib,&f00);
@@ -276,14 +282,13 @@ static void build_fic_frame(uint8_t *fics /* 96 bytes */, uint32_t frame_count,
     for(int i=first;i<n_svcs&&i<first+4;++i){fig0_2_audio_t f={.service_id=svcs[i].service_id,.ca_id=0,.local_flag=0,.asc_type=svcs[i].asc_type,.sub_ch_id=svcs[i].sub_ch_id};fig0_2_audio_write(&fib,&f);}
     fib_finalize(&fib);std::memcpy(fics+32,fib.bytes,32);
     fib_reset(&fib);
-    const unsigned carousel=(unsigned)(frame_count%5u);
     if(carousel==0){
         fig0_9_write(&fib,ecc,current_lto_half_hours());
         for(int i=first;i<n_svcs&&i<first+4;++i){fig0_8_audio_t f={.service_id=svcs[i].service_id,.sc_ids=svcs[i].sc_ids,.sub_ch_id=svcs[i].sub_ch_id};fig0_8_audio_write(&fib,&f);}
     }
     else if(carousel==1){
         fig0_9_write(&fib,ecc,current_lto_half_hours());
-        int slot=(int)(((frame_count/4u)%(unsigned)(n_svcs+1)));
+        int slot=(int)((supercycle*pages+page)%(unsigned)(n_svcs+1));
         if(slot==0)fig1_0_write(&fib,ensemble_id,ens_label,0);else fig1_1_write(&fib,svcs[slot-1].service_id,svcs[slot-1].label,svcs[slot-1].short_label_flag);
     }
     else if(carousel==2) {
@@ -292,12 +297,12 @@ static void build_fic_frame(uint8_t *fics /* 96 bytes */, uint32_t frame_count,
         int mot_count=0;for(int i=0;i<n_svcs;++i)if(svcs[i].mot_slideshow)++mot_count;
         if(mot_count==0)fig0_9_write(&fib,ecc,current_lto_half_hours());
         else {
-            int page13=(int)((frame_count/4u)%((unsigned)(mot_count+2)/3u));int skip=page13*3,written=0;
+            unsigned mot_pages=((unsigned)mot_count+2u)/3u;int page13=(int)((supercycle*pages+page)%mot_pages);int skip=page13*3,written=0;
             for(int i=0;i<n_svcs&&written<3;++i)if(svcs[i].mot_slideshow){if(skip){--skip;continue;}fig0_13_app_t f={.service_id=svcs[i].service_id,.sc_ids=svcs[i].sc_ids,.ua_type=0x002,.ua_data={0x0C,0x3C},.ua_data_len=2};if(fig0_13_write(&fib,&f)==0)++written;}
         }
     }
     else if(carousel==3) {
-        int first17=(int)(((frame_count/4u)%((unsigned)(n_svcs+4)/5u))*5u);
+        unsigned pty_pages=((unsigned)n_svcs+4u)/5u;int first17=(int)(((supercycle*pages+page)%pty_pages)*5u);
         for(int i=first17;i<n_svcs&&i<first17+5;++i){fig0_17_t f={.service_id=svcs[i].service_id,.pty=svcs[i].pty};fig0_17_write(&fib,&f);}
     }
     else {
@@ -306,6 +311,36 @@ static void build_fic_frame(uint8_t *fics /* 96 bytes */, uint32_t frame_count,
         fig0_10_write(&fib,&f);
     }
     fib_finalize(&fib);std::memcpy(fics+64,fib.bytes,32);
+}
+
+static int fic_coverage_test(int n_svcs) {
+    if (n_svcs < 1 || n_svcs > 64) return 2;
+    std::vector<dab_svc_desc> svcs((size_t)n_svcs);
+    std::vector<std::array<char,17>> labels((size_t)n_svcs);
+    for (int i=0;i<n_svcs;++i) {
+        std::snprintf(labels[(size_t)i].data(),17,"Service %02d",i+1);
+        svcs[(size_t)i]={.service_id=(uint16_t)(0xF001+i),
+                         .sub_ch_id=(uint8_t)i,.sc_ids=0,
+                         .start_addr_cu=(uint16_t)(i*12),.sub_ch_size_cus=12,
+                         .eep_profile=DAB_EEP_3A,.label=labels[(size_t)i].data(),
+                         .short_label_flag=0,.mot_slideshow=false,.pty=0,.asc_type=0x3F};
+    }
+    std::vector<bool> subch((size_t)n_svcs),org((size_t)n_svcs),link((size_t)n_svcs),label((size_t)n_svcs);
+    for (uint32_t frame=0;frame<2000;++frame) {
+        uint8_t fics[96];build_fic_frame(fics,frame,0xE035,0xE0,"FIC coverage",svcs.data(),n_svcs);
+        for(int f=0;f<3;++f){const uint8_t*p=fics+f*32;size_t pos=0;
+            while(pos<30&&p[pos]!=0xFF){unsigned type=p[pos]>>5,len=p[pos]&0x1F;size_t total=(size_t)len+1;if(!len||pos+total>30)break;const uint8_t*q=p+pos;
+                if(type==0&&len>=2){unsigned ext=q[1]&0x1F;if(ext==1&&total>=6){unsigned id=q[2]>>2;if(id<(unsigned)n_svcs)subch[id]=true;}
+                    else if((ext==2||ext==8)&&total>=4){unsigned sid=((unsigned)q[2]<<8)|q[3];if(sid>=0xF001&&sid<(unsigned)(0xF001+n_svcs))(ext==2?org:link)[sid-0xF001]=true;}}
+                else if(type==1&&len>=3&&(q[1]&7)==1){unsigned sid=((unsigned)q[2]<<8)|q[3];if(sid>=0xF001&&sid<(unsigned)(0xF001+n_svcs))label[sid-0xF001]=true;}
+                pos+=total;
+            }
+        }
+    }
+    for(int i=0;i<n_svcs;++i)if(!subch[(size_t)i]||!org[(size_t)i]||!link[(size_t)i]||!label[(size_t)i]){
+        LOGE("FIC coverage missing service %d: subch=%d org=%d link=%d label=%d",i+1,(int)subch[(size_t)i],(int)org[(size_t)i],(int)link[(size_t)i],(int)label[(size_t)i]);return 1;}
+    LOGI("FIC coverage OK: all %d services announced in FIG 0/1, 0/2, 0/8 and 1/1",n_svcs);
+    return 0;
 }
 
 /* Single-service convenience wrapper (used by eti-test). */
@@ -467,6 +502,7 @@ struct svc_pipe {
     twolame_options *mp2{};
     std::vector<uint8_t> mp2_pending;
     unsigned mp2_cifs_per_frame{1};
+    unsigned mp2_crc_bytes{2};
     std::vector<std::filesystem::path> mot_files;
     size_t          mot_index{};
     uint64_t        mot_fingerprint{};
@@ -519,10 +555,14 @@ static bool svc_pipe_init(svc_pipe &p, const char *source_spec, int bitrate_kbps
         if(!p.mp2||twolame_set_in_samplerate(p.mp2,sample_rate)||twolame_set_out_samplerate(p.mp2,sample_rate)||
            twolame_set_num_channels(p.mp2,channels)||twolame_set_mode(p.mp2,channels==1?TWOLAME_MONO:TWOLAME_STEREO)||
            twolame_set_bitrate(p.mp2,bitrate_kbps)||twolame_set_DAB(p.mp2,1)||
-           twolame_set_DAB_xpad_length(p.mp2,PAD_SCHED_XPAD_MAX+2)||twolame_set_error_protection(p.mp2,1)||
+           twolame_set_DAB_xpad_length(p.mp2,PAD_SCHED_XPAD_MAX)||
+           twolame_set_num_ancillary_bits(p.mp2,(PAD_SCHED_XPAD_MAX+4+2)*8)||
+           twolame_set_error_protection(p.mp2,1)||
            twolame_init_params(p.mp2)<0||twolame_set_DAB_scf_crc_length(p.mp2)<0){
             LOGE("unsupported DAB MP2 format: %d kbps",bitrate_kbps);if(p.mp2)twolame_close(&p.mp2);wolfdab_source_close(p.src);p.src=nullptr;return false;
         }
+        p.mp2_crc_bytes=(unsigned)twolame_get_DAB_crc_length(p.mp2);
+        if(p.mp2_crc_bytes!=2&&p.mp2_crc_bytes!=4){LOGE("invalid DAB MP2 ScF-CRC length");twolame_close(&p.mp2);wolfdab_source_close(p.src);p.src=nullptr;return false;}
         p.subch=dab_msc_subch_new(bitrate_kbps,start_cu,eep_profile);
         if(!p.subch){twolame_close(&p.mp2);wolfdab_source_close(p.src);p.src=nullptr;return false;}
         p.pad=pad_sched_new(dls_text,0,slide_path);p.mot_folder=mot_folder?mot_folder:"";p.mot_interval=mot_interval?mot_interval:10;
@@ -695,7 +735,12 @@ static int svc_pipe_produce_mp2(svc_pipe &p) {
             twolame_set_DAB_scf_crc(p.mp2,p.mp2_pending.data(),(int)p.mp2_pending.size());
             uint8_t xp[PAD_SCHED_XPAD_MAX],f0=0,f1=0;int xl=p.pad?pad_sched_get_xpad(p.pad,xp,sizeof(xp),&f0,&f1):0;
             if(p.mp2_pending.size()!=p.bytes_per_cif*p.mp2_cifs_per_frame)return -1;
-            if(xl>0&&(size_t)xl+2<=p.mp2_pending.size()){size_t off=p.mp2_pending.size()-(size_t)xl-2;memcpy(p.mp2_pending.data()+off,xp,(size_t)xl);p.mp2_pending[p.mp2_pending.size()-2]=f0;p.mp2_pending[p.mp2_pending.size()-1]=f1;}
+            if(xl>0&&(size_t)xl+p.mp2_crc_bytes+2<=p.mp2_pending.size()){
+                size_t off=p.mp2_pending.size()-(size_t)xl-p.mp2_crc_bytes-2;
+                memcpy(p.mp2_pending.data()+off,xp,(size_t)xl);
+                p.mp2_pending[p.mp2_pending.size()-2]=f0;
+                p.mp2_pending[p.mp2_pending.size()-1]=f1;
+            }
             for(unsigned c=0;c<p.mp2_cifs_per_frame;++c){std::array<uint8_t,2048> chunk{};memcpy(chunk.data(),p.mp2_pending.data()+(size_t)c*p.bytes_per_cif,p.bytes_per_cif);p.cif_queue.push_back(chunk);}
         }
         p.mp2_pending=std::move(frame);
@@ -849,6 +894,15 @@ static int cmd_tx(const char *const *source_specs, int n_svcs,
         pipes[i].desc.sc_ids = scids[i];
         pipes[i].desc.pty = ptys ? ptys[i] : 0;
         pipes[i].desc.short_label_flag=short_label_flag(svc_labels[i],short_labels?short_labels[i]:nullptr);
+    }
+
+    for (int i = 0; i < n_svcs; ++i) {
+        if (svc_pipe_produce(pipes[i]) != 0) {
+            LOGE("preflight encoder failed for service %d (%.*s)",
+                 i + 1, 16, pipes[i].desc.label);
+            for (int j = 0; j < n_svcs; ++j) svc_pipe_close(pipes[j]);
+            return 1;
+        }
     }
 
     dab_frame_ctx_t *fctx = dab_frame_new();
@@ -1420,6 +1474,8 @@ int main(int argc, char **argv) {
         if (a == "--list-audio")         return pa_list_input_devices();
         if (a == "--list-channels")      return cmd_list_channels();
         if (a == "--probe-hackrf")       return hackrf_tx_probe();
+        if (a == "--fic-coverage-test" && i + 1 < nargs)
+            return fic_coverage_test(std::atoi(args[i + 1]));
         if (a == "--capture-test" && i + 2 < nargs) {
             int dev = std::atoi(args[i + 1]);
             int sec = std::atoi(args[i + 2]);

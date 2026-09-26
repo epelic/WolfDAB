@@ -18,7 +18,7 @@
 #include "license_win.h"
 
 namespace {
-constexpr const wchar_t* APP_VERSION=L"1.0.24";
+constexpr const wchar_t* APP_VERSION=L"1.0.25";
 constexpr int ID_LANG=100, ID_ADD=101, ID_REMOVE=102, ID_START=103, ID_STOP=104, ID_BROWSE=105, ID_APPLY_FORMAT=106;
 constexpr int ID_ENSEMBLE=110, ID_EID=111, ID_ECC=112, ID_CHANNEL=113, ID_GAIN=114, ID_AMP=115;
 constexpr int ID_SERVICE=120, ID_SID=121, ID_SOURCE=122, ID_BITRATE=123, ID_EEP=124, ID_DLS=125, ID_CODEC=126, ID_SAMPLING=127;
@@ -46,6 +46,7 @@ std::vector<Service> services;
 bool italian=true;
 int registrationLanguage=0;
 bool registrationFailed=false;
+bool loadingService=false;
 int selectedService=-1;
 std::wstring configPath;
 std::wstring startupConfig;
@@ -57,12 +58,34 @@ std::wstring readLastConfig(){wchar_t path[32768]{};DWORD bytes=sizeof(path);if(
 void setText(HWND h, const std::wstring& s) { SetWindowTextW(h, s.c_str()); }
 std::wstring text(HWND h) { int n=GetWindowTextLengthW(h); std::wstring s((size_t)n+1,L'\0'); GetWindowTextW(h,s.data(),n+1); s.resize((size_t)n); return s; }
 unsigned capacity() { unsigned total=0; for (auto& s:services) total += dab_eep_cu_for_bitrate(s.bitrate,s.eep); return total; }
+bool serviceProblem(size_t index) {
+    if(index>=services.size())return true;
+    const auto&s=services[index];
+    wchar_t*sidEnd=nullptr;unsigned long sid=wcstoul(s.sid.c_str(),&sidEnd,0);
+    if(s.sid.empty()||!sidEnd||sidEnd==s.sid.c_str()||*sidEnd||sid>0xffff||s.scids>15||s.subch>63)return true;
+    if(!s.bitrate||dab_eep_cu_for_bitrate(s.bitrate,s.eep)==0)return true;
+    if(s.codec>3||(s.channels!=1&&s.channels!=2))return true;
+    if(s.codec==3){if(s.sampling!=24000&&s.sampling!=48000)return true;}
+    else if(s.sampling!=32000&&s.sampling!=48000)return true;
+    if(s.codec==1&&s.channels==1&&s.bitrate>64)return true;
+    if(s.codec==2&&s.channels!=2)return true;
+    if(s.source.empty())return true;
+    if(s.source.rfind(L"file:",0)==0){const std::wstring path=s.source.substr(5);if(path.empty()||GetFileAttributesW(path.c_str())==INVALID_FILE_ATTRIBUTES)return true;}
+    else if(s.source.rfind(L"stream:",0)==0){const std::wstring url=s.source.substr(7);if(url.rfind(L"http://",0)!=0&&url.rfind(L"https://",0)!=0)return true;}
+    else if(s.source.rfind(L"tone:",0)!=0&&s.source.rfind(L"device:",0)!=0)return true;
+    for(size_t j=0;j<services.size();++j)if(j!=index){
+        wchar_t*otherEnd=nullptr;unsigned long otherSid=wcstoul(services[j].sid.c_str(),&otherEnd,0);
+        if((otherEnd&&otherEnd!=services[j].sid.c_str()&&!*otherEnd&&otherSid==sid)||services[j].subch==s.subch)return true;
+    }
+    return false;
+}
 bool txRunning(){return txProcess&&WaitForSingleObject(txProcess,0)==WAIT_TIMEOUT;}
 void status() { wchar_t b[200]; unsigned c=capacity(); swprintf(b,200,txRunning()?tr(L"TX ATTIVO   •   MUX: %u / 864 CU   •   %.1f%%",L"TX RUNNING   •   MUX: %u / 864 CU   •   %.1f%%"):tr(L"Pronto   •   MUX: %u / 864 CU   •   %.1f%%",L"Ready   •   MUX: %u / 864 CU   •   %.1f%%"),c,c*100.0/864.0); SendMessageW(statusbar,SB_SETTEXT,0,(LPARAM)b); }
 void fillProfiles() { SendMessageW(comboEep,CB_RESETCONTENT,0,0); for(int p=0;p<8;++p) SendMessageA(comboEep,CB_ADDSTRING,0,(LPARAM)dab_eep_profile_name((dab_eep_profile_t)p)); }
 void fillPtys(){if(!comboPty)return;int keep=(int)SendMessageW(comboPty,CB_GETCURSEL,0,0);const wchar_t*it[]={L"Nessuno",L"Notizie",L"Attualità",L"Informazione",L"Sport",L"Educazione",L"Teatro",L"Cultura",L"Scienza",L"Vari",L"Pop",L"Rock",L"Easy listening",L"Classica leggera",L"Classica",L"Altra musica",L"Meteo",L"Finanza",L"Bambini",L"Società",L"Religione",L"Telefonate",L"Viaggi",L"Tempo libero",L"Jazz",L"Country",L"Musica nazionale",L"Oldies",L"Folk",L"Documentari",L"Test allarme",L"Allarme"};const wchar_t*en[]={L"None",L"News",L"Current affairs",L"Information",L"Sport",L"Education",L"Drama",L"Culture",L"Science",L"Varied",L"Pop",L"Rock",L"Easy listening",L"Light classical",L"Serious classical",L"Other music",L"Weather",L"Finance",L"Children",L"Social affairs",L"Religion",L"Phone-in",L"Travel",L"Leisure",L"Jazz",L"Country",L"National music",L"Oldies",L"Folk",L"Documentary",L"Alarm test",L"Alarm"};SendMessageW(comboPty,CB_RESETCONTENT,0,0);for(int i=0;i<32;++i){wchar_t b[80];swprintf(b,80,L"%02d — %s",i,italian?it[i]:en[i]);SendMessageW(comboPty,CB_ADDSTRING,0,(LPARAM)b);}SendMessageW(comboPty,CB_SETCURSEL,keep<0?0:keep,0);}
 void fillTimezones(){if(!comboTimezone)return;int keep=(int)SendMessageW(comboTimezone,CB_GETCURSEL,0,0);SendMessageW(comboTimezone,CB_RESETCONTENT,0,0);SendMessageW(comboTimezone,CB_ADDSTRING,0,(LPARAM)tr(L"Automatico (Windows)",L"Automatic (Windows)"));for(int half=-31;half<=31;++half){int a=half<0?-half:half;wchar_t b[32];swprintf(b,32,L"UTC%c%02d:%02d",half<0?L'-':L'+',a/2,(a%2)*30);SendMessageW(comboTimezone,CB_ADDSTRING,0,(LPARAM)b);}SendMessageW(comboTimezone,CB_SETCURSEL,keep<0?0:keep,0);}
 void populateList() {
+    const int previousTop = list ? ListView_GetTopIndex(list) : 0;
     ListView_DeleteAllItems(list);
     const int compactWidths[9]={122,72,64,86,62,68,38,46,58};
     for(int c=0;c<9;++c) ListView_SetColumnWidth(list,c,compactWidths[c]);
@@ -73,7 +96,12 @@ void populateList() {
         ListView_SetItemText(list,(int)i,1,s.sid.data()); ListView_SetItemText(list,(int)i,2,rate);ListView_SetItemText(list,(int)i,3,(LPWSTR)codec);ListView_SetItemText(list,(int)i,4,sampling);
         std::wstring p; for(int k=0;k<8;k++) if(s.eep==(dab_eep_profile_t)k) { const char* a=dab_eep_profile_name((dab_eep_profile_t)k); p.assign(a,a+strlen(a)); }
         wchar_t pty[16];swprintf(pty,16,L"%u",s.pty);ListView_SetItemText(list,(int)i,5,p.data()); ListView_SetItemText(list,(int)i,6,cu);ListView_SetItemText(list,(int)i,7,pty);ListView_SetItemText(list,(int)i,8,(LPWSTR)(s.channels==1?L"Mono":L"Stereo"));
-    } status();
+    }
+    if(previousTop>0 && !services.empty()){
+        RECT row{};
+        if(ListView_GetItemRect(list,0,&row,LVIR_BOUNDS))ListView_Scroll(list,0,previousTop*(row.bottom-row.top));
+    }
+    status();
 }
 int sel() { return ListView_GetNextItem(list,-1,LVNI_SELECTED); }
 void createLabel(const wchar_t* s,int x,int y,int w);
@@ -86,15 +114,17 @@ void ensureMotControls(){if(editMotFolder)return;motFolderLabel=CreateWindowW(L"
 void browseMotFolder(){BROWSEINFOW bi{};bi.hwndOwner=wnd;bi.lpszTitle=tr(L"Seleziona la cartella delle immagini MOT",L"Select the MOT image folder");bi.ulFlags=BIF_RETURNONLYFSDIRS|BIF_NEWDIALOGSTYLE;PIDLIST_ABSOLUTE pid=SHBrowseForFolderW(&bi);if(pid){wchar_t path[MAX_PATH]{};if(SHGetPathFromIDListW(pid,path))setText(editMotFolder,path);CoTaskMemFree(pid);}}
 void ensureIdentityControls(){if(editScids)return;SendMessageW(comboChannel,CB_RESETCONTENT,0,0);const wchar_t*blocks[]={L"5A",L"5B",L"5C",L"5D",L"6A",L"6B",L"6C",L"6D",L"7A",L"7B",L"7C",L"7D",L"8A",L"8B",L"8C",L"8D",L"9A",L"9B",L"9C",L"9D",L"10A",L"10N",L"10B",L"10C",L"10D",L"11A",L"11N",L"11B",L"11C",L"11D",L"12A",L"12N",L"12B",L"12C",L"12D",L"13A",L"13B",L"13C",L"13D",L"13E",L"13F",L"LA",L"LB",L"LC",L"LD",L"LE",L"LF",L"LG",L"LH",L"LI",L"LJ",L"LK",L"LL",L"LM",L"LN",L"LO",L"LP",L"LQ",L"LR",L"LS",L"LT",L"LU",L"LV",L"LW"};for(auto*s:blocks)SendMessageW(comboChannel,CB_ADDSTRING,0,(LPARAM)s);SendMessageW(comboChannel,CB_SETCURSEL,0,0);SetWindowLongPtrW(comboChannel,GWL_STYLE,GetWindowLongPtrW(comboChannel,GWL_STYLE)|WS_VSCROLL|CBS_NOINTEGRALHEIGHT);SendMessageW(comboChannel,CB_SETDROPPEDWIDTH,90,0);SendMessageW(comboChannel,CB_SETMINVISIBLE,10,0);SetWindowPos(comboChannel,nullptr,460,532,90,240,SWP_NOZORDER|SWP_FRAMECHANGED);COMBOBOXINFO ci{sizeof(ci)};if(GetComboBoxInfo(comboChannel,&ci)&&ci.hwndList){SetWindowLongPtrW(ci.hwndList,GWL_STYLE,GetWindowLongPtrW(ci.hwndList,GWL_STYLE)|WS_VSCROLL);ShowScrollBar(ci.hwndList,SB_VERT,TRUE);}SetWindowTextW(ampCheck,tr(L"Amplificatore ON",L"Amplifier ON"));SetWindowPos(editSid,nullptr,696,194,105,24,SWP_NOZORDER);createLabel(tr(L"ID breve",L"Short label"),815,172,100);editScids=edit(129,815,194,100);createLabel(L"SCId",925,172,55);editScidValue=edit(ID_SCID,925,194,55);createLabel(L"SubCh",990,172,70);editSubch=edit(130,990,194,70);SendMessageW(editScids,WM_SETFONT,(WPARAM)uiFont,TRUE);SendMessageW(editScidValue,WM_SETFONT,(WPARAM)uiFont,TRUE);SendMessageW(editSubch,WM_SETFONT,(WPARAM)uiFont,TRUE);}
 void ensureChannelModeControl(){if(comboChannels)return;LVCOLUMNW c{};c.mask=LVCF_TEXT|LVCF_WIDTH;c.pszText=(LPWSTR)tr(L"Audio",L"Audio");c.cx=58;ListView_InsertColumn(list,8,&c);for(size_t i=0;i<services.size();++i)ListView_SetItemText(list,(int)i,8,(LPWSTR)(services[i].channels==1?L"Mono":L"Stereo"));createLabel(tr(L"Canali",L"Channels"),1068,172,120);comboChannels=CreateWindowW(WC_COMBOBOXW,L"",WS_CHILD|WS_VISIBLE|CBS_DROPDOWNLIST,1068,194,194,120,wnd,(HMENU)ID_CHANNELS,0,0);SendMessageW(comboChannels,CB_ADDSTRING,0,(LPARAM)L"Mono");SendMessageW(comboChannels,CB_ADDSTRING,0,(LPARAM)L"Stereo");SendMessageW(comboChannels,CB_SETCURSEL,1,0);SendMessageW(comboChannels,WM_SETFONT,(WPARAM)uiFont,TRUE);}
-void addClonedService(){saveSelected(true);if(services.size()>=64){MessageBoxW(wnd,tr(L"Sono disponibili 64 SubCh (0–63).",L"64 SubCh values are available (0–63)."),L"WolfDAB",MB_ICONINFORMATION);return;}if(services.empty()){services.emplace_back();}else{Service s=services.back();unsigned long sid=std::wcstoul(s.sid.c_str(),nullptr,0);sid=(sid+1)&0xffff;wchar_t b[16];swprintf(b,16,L"0x%04lX",sid);s.sid=b;s.subch=(s.subch+1)&63;s.scids=(s.scids+1)&15;services.push_back(std::move(s));}populateList();int i=(int)services.size()-1;selectedService=i;ListView_SetItemState(list,i,LVIS_SELECTED,LVIS_SELECTED);loadSelected();}
+void addClonedService(){saveSelected(true);if(services.size()>=64){MessageBoxW(wnd,tr(L"Sono disponibili 64 SubCh (0–63).",L"64 SubCh values are available (0–63)."),L"WolfDAB",MB_ICONINFORMATION);return;}if(services.empty()){services.emplace_back();}else{Service s=services.back();unsigned long sid=std::wcstoul(s.sid.c_str(),nullptr,0);sid=(sid+1)&0xffff;wchar_t b[16];swprintf(b,16,L"0x%04lX",sid);s.sid=b;s.subch=(s.subch+1)&63;services.push_back(std::move(s));}populateList();int i=(int)services.size()-1;selectedService=i;ListView_SetItemState(list,i,LVIS_SELECTED,LVIS_SELECTED);ListView_EnsureVisible(list,i,FALSE);loadSelected();}
 void fillSampling(unsigned codec,unsigned value){SendMessageW(comboSampling,CB_RESETCONTENT,0,0);SendMessageW(comboSampling,CB_ADDSTRING,0,(LPARAM)(codec==3?L"24 kHz":L"32 kHz"));SendMessageW(comboSampling,CB_ADDSTRING,0,(LPARAM)L"48 kHz");SendMessageW(comboSampling,CB_SETCURSEL,value==48000?1:0,0);}
 void loadSelected() {
     ensureIdentityControls();ensureChannelModeControl();ensureBulkControl();ensureMotControls(); int i=selectedService;
     SendMessageW(editScids,EM_SETLIMITTEXT,8,0);
     if(i<0 || (size_t)i>=services.size())return; auto&s=services[i];
+    loadingService=true;
     setText(editService,s.label);setText(editSid,s.sid);setText(editScids,s.shortLabel);setText(editScidValue,std::to_wstring(s.scids));setText(editSubch,std::to_wstring(s.subch));setText(editRate,std::to_wstring(s.bitrate));setText(editDls,s.dls);setText(editMotFolder,s.motFolder);setText(editMotInterval,std::to_wstring(s.motInterval));
     int type=0;std::wstring v=s.source;if(v.rfind(L"tone:",0)==0){type=1;v=v.substr(5);}else if(v.rfind(L"file:",0)==0){type=2;v=v.substr(5);}else if(v.rfind(L"stream:",0)==0){type=3;v=v.substr(7);}else if(v.rfind(L"device:",0)==0)v=v.substr(7);
     SendMessageW(comboSource,CB_SETCURSEL,type,0);setText(editSource,v);SendMessageW(comboCodec,CB_SETCURSEL,s.codec,0);fillSampling(s.codec,s.sampling);SendMessageW(comboEep,CB_SETCURSEL,s.eep,0);SendMessageW(comboPty,CB_SETCURSEL,s.pty,0);SendMessageW(comboChannels,CB_SETCURSEL,s.channels==1?0:1,0);
+    loadingService=false;
 }
 void saveSelected(bool refresh=true) {
     int i=selectedService;
@@ -189,12 +219,12 @@ if(!wolfdab_license::is_registered()&&!wolfdab_license::show_registration(h,regi
 #endif
 if(startupConfig.empty())startupConfig=readLastConfig();if(!startupConfig.empty()){configPath=startupConfig;loadConfig(configPath);}refreshLanguage();EnableWindow(GetDlgItem(h,ID_STOP),FALSE);checkUpdates(true);return 0;
  case WM_CTLCOLORSTATIC:{HDC dc=(HDC)w;SetBkMode(dc,TRANSPARENT);if(GetDlgCtrlID((HWND)l)==ID_ACCENT)return(LRESULT)accentBrush;return(LRESULT)windowBrush;}
- case WM_NOTIFY:if(((LPNMHDR)l)->hwndFrom==list&&((LPNMHDR)l)->code==NM_CLICK){auto*n=(NMITEMACTIVATE*)l;if(n->iItem>=0&&n->iItem!=selectedService){saveSelected(false);selectedService=n->iItem;loadSelected();}}break;
+ case WM_NOTIFY:{auto*hdr=(LPNMHDR)l;if(hdr->hwndFrom==list&&hdr->code==NM_CUSTOMDRAW){auto*draw=(NMLVCUSTOMDRAW*)l;if(draw->nmcd.dwDrawStage==CDDS_PREPAINT)return CDRF_NOTIFYITEMDRAW;if(draw->nmcd.dwDrawStage==CDDS_ITEMPREPAINT){size_t row=(size_t)draw->nmcd.dwItemSpec;if(serviceProblem(row)){draw->clrText=RGB(0,0,0);draw->clrTextBk=RGB(255,225,225);}return CDRF_DODEFAULT;}}if(hdr->hwndFrom==list&&hdr->code==NM_CLICK){auto*n=(NMITEMACTIVATE*)l;if(n->iItem>=0&&n->iItem!=selectedService){saveSelected(false);selectedService=n->iItem;loadSelected();}}break;}
  case WM_TIMER:if(txProcess&&!txRunning())finishTx();else if(!txStopping)status();return 0;
  case WM_UPDATE_RESULT:{auto*r=(UpdateResult*)l;if(!r)return 0;if(r->newer){std::wstring msg=updateText(L"È disponibile WolfDAB ",L"WolfDAB ",L"WolfDAB ",L"WolfDAB ");msg+=r->version;msg+=updateText(L".\n\nScaricare l'aggiornamento? La registrazione resterà valida.",L" is available.\n\nDownload the update? Your registration will remain valid.",L" ist verfügbar.\n\nUpdate herunterladen? Die Registrierung bleibt gültig.",L" est disponible.\n\nTélécharger la mise à jour ? L'enregistrement restera valide.");if(MessageBoxW(h,msg.c_str(),L"WolfDAB",MB_YESNO|MB_ICONINFORMATION)==IDYES)ShellExecuteW(h,L"open",r->url.c_str(),nullptr,nullptr,SW_SHOWNORMAL);}else if(!r->silent){MessageBoxW(h,r->ok?updateText(L"WolfDAB è aggiornato.",L"WolfDAB is up to date.",L"WolfDAB ist aktuell.",L"WolfDAB est à jour."):updateText(L"Impossibile controllare gli aggiornamenti.",L"Unable to check for updates.",L"Aktualisierungen konnten nicht geprüft werden.",L"Impossible de vérifier les mises à jour."),L"WolfDAB",MB_OK|(r->ok?MB_ICONINFORMATION:MB_ICONWARNING));}delete r;return 0;}
- case WM_COMMAND:{int id=LOWORD(w),code=HIWORD(w);if(code==CBN_SELCHANGE&&id==ID_CODEC){unsigned co=(unsigned)SendMessageW(comboCodec,CB_GETCURSEL,0,0);fillSampling(co,48000);}if(code==EN_CHANGE&&(id==ID_SCIDS||id==ID_SCID||id==ID_SUBCH)){int i=selectedService;if(i>=0&&(size_t)i<services.size()){std::wstring v=text((HWND)l);if(id==ID_SCIDS){services[(size_t)i].shortLabel=v.substr(0,8);}else{wchar_t*end=nullptr;unsigned long n=wcstoul(v.c_str(),&end,10);if(end&&*end==0){if(id==ID_SCID&&n<=15)services[(size_t)i].scids=(unsigned)n;else if(id==ID_SUBCH&&n<=63)services[(size_t)i].subch=(unsigned)n;}}}}if(code==EN_CHANGE&&id==ID_BITRATE&&selectedService>=0&&(size_t)selectedService<services.size()){std::wstring v=text(editRate);wchar_t*end=nullptr;unsigned long n=wcstoul(v.c_str(),&end,10);if(end&&end!=v.c_str()&&*end==0){services[(size_t)selectedService].bitrate=(unsigned)n;int keep=selectedService;populateList();selectedService=keep;ListView_SetItemState(list,keep,LVIS_SELECTED,LVIS_SELECTED);status();}}if((code==EN_KILLFOCUS&&(id==ID_SERVICE||id==ID_SID||id==ID_SOURCE_VALUE||id==ID_BITRATE||id==ID_DLS||id==ID_SCIDS||id==ID_SCID||id==ID_SUBCH||id==ID_MOT_FOLDER||id==ID_MOT_INTERVAL))||(code==CBN_SELCHANGE&&(id==ID_SOURCE||id==ID_CODEC||id==ID_SAMPLING||id==ID_EEP||id==ID_PTY)))saveSelected(false);switch(id){
+ case WM_COMMAND:{int id=LOWORD(w),code=HIWORD(w);if(!loadingService&&code==CBN_SELCHANGE&&id==ID_CODEC){unsigned co=(unsigned)SendMessageW(comboCodec,CB_GETCURSEL,0,0);fillSampling(co,48000);}if(!loadingService&&code==EN_CHANGE&&(id==ID_SCIDS||id==ID_SCID||id==ID_SUBCH)){int i=selectedService;if(i>=0&&(size_t)i<services.size()){std::wstring v=text((HWND)l);if(id==ID_SCIDS){services[(size_t)i].shortLabel=v.substr(0,8);}else{wchar_t*end=nullptr;unsigned long n=wcstoul(v.c_str(),&end,10);if(end&&*end==0){if(id==ID_SCID&&n<=15)services[(size_t)i].scids=(unsigned)n;else if(id==ID_SUBCH&&n<=63)services[(size_t)i].subch=(unsigned)n;}}}}if(!loadingService&&code==EN_CHANGE&&id==ID_BITRATE&&selectedService>=0&&(size_t)selectedService<services.size()){std::wstring v=text(editRate);wchar_t*end=nullptr;unsigned long n=wcstoul(v.c_str(),&end,10);if(end&&end!=v.c_str()&&*end==0){services[(size_t)selectedService].bitrate=(unsigned)n;int keep=selectedService;populateList();selectedService=keep;ListView_SetItemState(list,keep,LVIS_SELECTED,LVIS_SELECTED);status();}}if(!loadingService&&((code==EN_KILLFOCUS&&(id==ID_SERVICE||id==ID_SID||id==ID_SOURCE_VALUE||id==ID_BITRATE||id==ID_DLS||id==ID_SCIDS||id==ID_SCID||id==ID_SUBCH||id==ID_MOT_FOLDER||id==ID_MOT_INTERVAL))||(code==CBN_SELCHANGE&&(id==ID_SOURCE||id==ID_CODEC||id==ID_SAMPLING||id==ID_EEP||id==ID_PTY))))saveSelected(false);switch(id){
   case ID_BROWSE:browseAudio();break;case ID_MOT_BROWSE:browseMotFolder();break;case ID_LANG:saveSelected();italian=!italian;registrationLanguage=italian?0:1;refreshLanguage();break;case ID_ADD:addClonedService();break;case ID_APPLY_FORMAT:applyFormatToAll();break;
-  case ID_CODEC:case ID_SAMPLING:case ID_EEP:case ID_PTY:case ID_CHANNELS:if(code==CBN_SELCHANGE){saveSelected(false);int keep=selectedService;populateList();if(keep>=0){selectedService=keep;ListView_SetItemState(list,keep,LVIS_SELECTED,LVIS_SELECTED);}status();}break;
+  case ID_CODEC:case ID_SAMPLING:case ID_EEP:case ID_PTY:case ID_CHANNELS:if(!loadingService&&code==CBN_SELCHANGE){saveSelected(false);int keep=selectedService;populateList();if(keep>=0){selectedService=keep;ListView_SetItemState(list,keep,LVIS_SELECTED,LVIS_SELECTED);}status();}break;
   case ID_REMOVE:{int i=sel();if(i>=0){services.erase(services.begin()+i);selectedService=services.empty()?-1:((size_t)i<services.size()?i:(int)services.size()-1);populateList();if(selectedService>=0){ListView_SetItemState(list,selectedService,LVIS_SELECTED,LVIS_SELECTED);loadSelected();}}}break;
   case IDM_NEW:services.clear();selectedService=-1;configPath.clear();setText(editService,L"");setText(editSid,L"");setText(editScids,L"");setText(editSubch,L"");setText(editSource,L"");setText(editRate,L"");setText(editDls,L"");setText(editMotFolder,L"");setText(editMotInterval,L"");setText(editEnsemble,L"");setText(editEid,L"");setText(editEcc,L"");setText(editGain,L"");SendMessageW(comboChannel,CB_SETCURSEL,-1,0);SendMessageW(comboTimezone,CB_SETCURSEL,0,0);SendMessageW(ampCheck,BM_SETCHECK,BST_UNCHECKED,0);populateList();break;
   case IDM_OPEN:if(chooseConfig(false)&&!loadConfig(configPath))MessageBoxW(h,L"Unable to load configuration.",L"WolfDAB",MB_ICONERROR);break;
