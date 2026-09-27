@@ -1,0 +1,18 @@
+WOLFDAB ENDBENUTZER-LIZENZVEREINBARUNG
+
+Copyright (c) 2026 Freewaves.it - Emanuele Pelicioli
+Kontakt: max@freewaves.it
+
+1. Lizenz. WolfDAB wird kostenlos lizenziert, nicht verkauft. Die Zustimmung erlaubt die Nutzung auf ordnungsgemäß registrierten Rechnern.
+
+2. Registrierung. Die kostenlose Registrierung ist verpflichtend und dient nicht der Bezahlung. Das Anfrageformular übermittelt Freewaves.it Name, E-Mail, eine pseudonyme, vom Rechner abgeleitete Kennung sowie Stadt und Land, ausschließlich zur Bearbeitung der Anfrage, zum Zählen aktiver Installationen, zur Erfassung ihrer geografischen Verteilung und zur Verhinderung der Verwendung desselben Codes auf verschiedenen Rechnern. Datenanfragen: max@freewaves.it.
+
+3. Verteilung. Code und Komponenten unter der GNU GPL dürfen gemäß den GPL-Bedingungen kopiert und weitergegeben werden, auch gegen Bezahlung. Name WolfDAB, Logo Freewaves.it und offizieller Installer dürfen nicht verwendet werden, um eine geänderte Kopie oder einen kommerziellen Dienst als von Freewaves.it genehmigt erscheinen zu lassen. Eigentumshinweise dürfen nicht entfernt und Kennzeichen nicht irreführend verwendet werden.
+
+4. Rechte. WolfDAB, Name, Logo, Grafik und Originalcode bleiben Eigentum von Freewaves.it - Emanuele Pelicioli. Komponenten Dritter unterliegen den in der Dokumentation genannten Lizenzen.
+
+5. Funkbetrieb. Allein der Benutzer ist für Frequenzen, Leistung, Genehmigungen, Inhalte und die Einhaltung geltender Vorschriften verantwortlich. WolfDAB darf nur im gesetzlich zulässigen Rahmen oder an einer geeigneten Dummy-Last senden.
+
+6. Gewährleistung und Haftung. Die Software wird, soweit gesetzlich zulässig, ohne ausdrückliche oder stillschweigende Gewährleistung bereitgestellt. Freewaves.it und Emanuele Pelicioli haften nicht für direkte oder indirekte Schäden, Datenverlust, Unterbrechungen, Störungen, Strafen oder entgangenen Gewinn.
+
+7. Zustimmung. Mit Installation, Registrierung oder Nutzung von WolfDAB stimmen Sie diesen Bedingungen zu. Andernfalls installieren Sie die Software nicht beziehungsweise entfernen Sie sie.

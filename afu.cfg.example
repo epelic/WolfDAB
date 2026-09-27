@@ -1,0 +1,14 @@
+# DAB+ TX Konfiguration — Beispiel Amateurfunk 13 cm Band (ham-13a)
+# Rufzeichen und QTH bitte anpassen!
+
+ensemble = MYCALL AFU DAB+
+service  = MYCALL 13cm
+dls      = MYCALL - 13 cm DAB+ Testbetrieb - 73!
+slide    = test_slide.jpg
+
+# EPG Programmplan (Beispiel Fieldday / Contest)
+epg.1 = 09:00 | 10:00 | Aufbau und Antennenpruefung
+epg.2 = 10:00 | 12:00 | Contest-Betrieb CW/SSB
+epg.3 = 12:00 | 13:00 | Mittagspause - QSO-Runde
+epg.4 = 13:00 | 16:00 | Contest-Betrieb Digital
+epg.5 = 16:00 | 17:00 | Abbau und Ergebnisse

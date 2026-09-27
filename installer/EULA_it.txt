@@ -1,0 +1,18 @@
+CONTRATTO DI LICENZA D'USO WOLFDAB
+
+Copyright (c) 2026 Freewaves.it - Emanuele Pelicioli
+Contatto: max@freewaves.it
+
+1. Licenza. WolfDAB è concesso gratuitamente in licenza, non venduto. L'accettazione autorizza l'uso del programma su macchine regolarmente registrate.
+
+2. Registrazione. La registrazione gratuita è obbligatoria e non è finalizzata al pagamento. Il modulo di richiesta trasmette a Freewaves.it nome, email, un identificativo pseudonimo derivato dalla macchina e la località (città e Paese) dichiarata dall'utente, esclusivamente per gestire la richiesta, contare le installazioni attive, conoscerne la distribuzione geografica e impedire l'uso dello stesso codice su macchine diverse. Per richieste relative a tali dati: max@freewaves.it.
+
+3. Distribuzione. Il codice e le componenti coperti dalla GNU GPL possono essere copiati e ridistribuiti alle condizioni della GPL, anche dietro pagamento. Il nome WolfDAB, il logo Freewaves.it e l'installer ufficiale non possono essere usati per far apparire una copia modificata o un servizio commerciale come approvato da Freewaves.it. È vietato rimuovere le indicazioni di titolarità o usare i marchi in modo ingannevole.
+
+4. Diritti. WolfDAB, il nome, il logo, la grafica e il codice originale restano di proprietà di Freewaves.it - Emanuele Pelicioli. Le componenti di terzi conservano le rispettive licenze indicate nella documentazione.
+
+5. Uso radio. L'utente è l'unico responsabile di frequenze, potenza, autorizzazioni, contenuti e rispetto delle norme applicabili. WolfDAB deve essere usato in trasmissione soltanto dove e come legalmente autorizzato, oppure su carico fittizio adeguato.
+
+6. Garanzia e responsabilità. Il programma è fornito "così com'è", senza garanzie espresse o implicite, nei limiti consentiti dalla legge. Freewaves.it ed Emanuele Pelicioli non rispondono di danni diretti o indiretti, perdita di dati, interruzioni, interferenze, sanzioni o mancati profitti derivanti dall'uso o dall'impossibilità d'uso.
+
+7. Accettazione. Installando, registrando o usando WolfDAB si accettano queste condizioni. Se non si accettano, non installare e rimuovere il programma.

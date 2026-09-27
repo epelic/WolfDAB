@@ -1,0 +1,12 @@
+/build/
+/dist/
+/third_party/install/
+*.raw
+*.wav
+*.log
+*.out
+*.err
+.vs/
+.vscode/
+cmake-build-*/
+__pycache__/
