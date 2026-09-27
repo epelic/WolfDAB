@@ -47,7 +47,7 @@ WolfDAB was created by Emanuele Pelicioli — Freewaves.it, with the invaluable 
 
 ## Build / Compilazione
 
-Requires MSYS2 UCRT64, CMake, Ninja, GCC, libiio, libad9361, FFTW3f, and PortAudio. The DAB+ FDK-AAC fork is included as a submodule.
+Requires MSYS2 UCRT64, CMake, Ninja, GCC, libiio, libad9361, FFTW3f, and PortAudio. `setup.sh` downloads and builds the DAB+ FDK-AAC fork.
 
 ```bash
 git clone --recursive <repository-url>
