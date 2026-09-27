@@ -546,6 +546,8 @@ static bool svc_pipe_init(svc_pipe &p, const char *source_spec, int bitrate_kbps
     p.src = open_source_spec(source_spec, sample_rate);
     if (!p.src) return false;
 
+    if(codec==3){LOGE("DAB MP2 support has been removed; select an AAC codec");wolfdab_source_close(p.src);p.src=nullptr;return false;}
+
     int actual_codec=codec;
     p.channels = channels;
     if(codec==3){
@@ -1508,7 +1510,7 @@ int main(int argc, char **argv) {
                            (unsigned)std::atoi(args[i + 4]) : 0u;
             if(!cli_services.empty()){
                 int n=(int)cli_services.size();std::vector<const char*> ss(n),ls(n),ds(n),sls(n),mf(n);std::vector<int> br(n),co(n),sr(n),chans(n);std::vector<unsigned> mi(n);std::vector<dab_eep_profile_t> ep(n);std::vector<uint16_t> si(n);std::vector<uint8_t> sc(n),su(n),pt(n);std::vector<std::array<char,17>> lp(n);
-                for(int k=0;k<n;++k){auto&v=cli_services[k];bool sampling_ok=v.codec==3?(v.sampling==24000||v.sampling==48000):(v.sampling==32000||v.sampling==48000);if(v.codec>3||!sampling_ok||v.eep>DAB_EEP_4B||v.pty>31||(v.channels!=1&&v.channels!=2)){LOGE("invalid service format");return 2;}dab_label_pad(v.label.c_str(),lp[k].data());ss[k]=v.source.c_str();ls[k]=lp[k].data();ds[k]=v.dls.c_str();sls[k]=v.short_label.c_str();mf[k]=v.mot_folder.c_str();mi[k]=v.mot_interval;br[k]=(int)v.bitrate;co[k]=(int)v.codec;sr[k]=(int)v.sampling;chans[k]=(int)v.channels;ep[k]=(dab_eep_profile_t)v.eep;si[k]=(uint16_t)v.sid;sc[k]=(uint8_t)v.scids;su[k]=(uint8_t)v.subch;pt[k]=(uint8_t)v.pty;}
+                for(int k=0;k<n;++k){auto&v=cli_services[k];bool sampling_ok=v.sampling==32000||v.sampling==48000;if(v.codec>2||!sampling_ok||v.eep>DAB_EEP_4B||v.pty>31||(v.channels!=1&&v.channels!=2)){LOGE("invalid service format");return 2;}dab_label_pad(v.label.c_str(),lp[k].data());ss[k]=v.source.c_str();ls[k]=lp[k].data();ds[k]=v.dls.c_str();sls[k]=v.short_label.c_str();mf[k]=v.mot_folder.c_str();mi[k]=v.mot_interval;br[k]=(int)v.bitrate;co[k]=(int)v.codec;sr[k]=(int)v.sampling;chans[k]=(int)v.channels;ep[k]=(dab_eep_profile_t)v.eep;si[k]=(uint16_t)v.sid;sc[k]=(uint8_t)v.scids;su[k]=(uint8_t)v.subch;pt[k]=(uint8_t)v.pty;}
                 if(ensemble_id>0xffff||ensemble_ecc>0xff){LOGE("invalid ensemble identity");return 2;}
                 return cmd_tx(ss.data(),n,br.data(),co.data(),sr.data(),chans.data(),ep.data(),si.data(),sc.data(),su.data(),pt.data(),ch,sec,vga,amp_api_flag,(uint16_t)ensemble_id,(uint8_t)ensemble_ecc,ens_buf,ls.data(),ds.data(),sls.data(),slide_path,mf.data(),mi.data(),epg,spi);
             }

@@ -5,11 +5,11 @@ Scaricalo qui! https://www.freewaves.it/wolfdab.html o dalle releases qui su Git
 
 ## Italiano
 
-WolfDAB è un trasmettitore multiplex DAB/DAB+ multi-servizio per Windows 10/11 x64 e HackRF One. Include una GUI nativa, fino a 64 servizi entro 864 CU, FIC/MSC, modulazione COFDM Mode I a 2,048 MS/s e uscita diretta libhackrf.
+WolfDAB è un trasmettitore multiplex DAB+ multi-servizio per Windows 10/11 x64 e HackRF One. Include una GUI nativa, fino a 64 servizi entro 864 CU, FIC/MSC, modulazione COFDM Mode I a 2,048 MS/s e uscita diretta libhackrf.
 
 - Audio locale/WASAPI, tono e stream HTTP/HTTPS tramite FFmpeg
-- Buffer audio continuo con riaggancio automatico e protezione dai ritardi brevi di rete/Windows, anche nei multiplex DAB/DAB+ misti
-- DAB+ AAC e DAB classico MP2 per singolo servizio, anche combinati nello stesso ensemble
+- Buffer audio continuo con riaggancio automatico e protezione dai ritardi brevi di rete/Windows
+- Codec AAC-LC, HE-AAC v1 e HE-AAC v2 configurabili per ogni servizio
 - HE-AAC v1/v2, bitrate, sampling ed EEP configurabili con calcolo CU live
 - Service ID, etichetta lunga, etichetta breve DAB e SubCh
 - DLS manuale e titoli ICY automatici; cartella MOT Slideshow per ogni servizio con rotazione temporizzata e aggiornamenti live
@@ -28,11 +28,11 @@ WolfDAB è stato realizzato da Emanuele Pelicioli — Freewaves.it, con l'aiuto 
 
 Download it here! https://www.freewaves.it/wolfdab.html or from the releases here on Github.
 
-WolfDAB is a multi-service DAB/DAB+ multiplex transmitter for Windows 10/11 x64 and HackRF One. It includes a native GUI, up to 64 services within 864 CU, FIC/MSC generation, Mode I COFDM modulation at 2.048 MS/s, and direct libhackrf output.
+WolfDAB is a multi-service DAB+ multiplex transmitter for Windows 10/11 x64 and HackRF One. It includes a native GUI, up to 64 services within 864 CU, FIC/MSC generation, Mode I COFDM modulation at 2.048 MS/s, and direct libhackrf output.
 
 - Local/WASAPI audio, test tone, and HTTP/HTTPS streams through FFmpeg
-- Continuous audio buffering with automatic reconnection and protection against short network/Windows delays, including mixed DAB/DAB+ multiplexes
-- Per-service DAB+ AAC and classic DAB MP2, including mixed ensembles
+- Continuous audio buffering with automatic reconnection and protection against short network/Windows delays
+- Per-service AAC-LC, HE-AAC v1 and HE-AAC v2 encoding
 - Configurable HE-AAC v1/v2, bitrate, sampling, and EEP with live CU calculation
 - Service ID, long label, DAB short label, and SubCh
 - Manual DLS and automatic ICY titles; per-service MOT Slideshow folders with timed rotation and live updates
