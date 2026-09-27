@@ -1078,6 +1078,8 @@ static int cmd_tx_file(int dev, const char *channel_label, int seconds,
                        const char *ens_label, const char *svc_label,
                        const char *dls_text, const char *slide_path,
                        epg_t *epg, spi_enc_t *spi) {
+    SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
     const int bitrate_kbps = 72;    /* matches cmd_tx */
     const size_t BYTES_PER_CIF = (size_t)bitrate_kbps * 3u;  /* 216 */
     const uint16_t sub_ch_size_cus = (uint16_t)(bitrate_kbps * 6 / 8); /* 54 */

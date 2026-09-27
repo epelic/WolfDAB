@@ -136,11 +136,12 @@ size_t wolfdab_source_read(wolfdab_source_t*s,int16_t*dst,size_t samples){
     size_t buffered=s->pcm_buffer.size()-s->pcm_pos;
     const size_t prebuffer=(size_t)s->sample_rate*2u/5u; /* 200 ms stereo */
     if(!s->pcm_primed){if(buffered<std::max(samples,prebuffer))return 0;s->pcm_primed=true;}
-    /* Preserve accumulated audio through short FFmpeg/Windows delays. */
+    /* Never wait here: this function is called once per service by the same
+       real-time multiplex thread.  Preserve the accumulated PCM and lose
+       only this one block instead of starving the global RF stream. */
     if(buffered<samples){
-        const ULONGLONG deadline=GetTickCount64()+12;
-        do{Sleep(1);if(!pull_available())break;buffered=s->pcm_buffer.size()-s->pcm_pos;}while(buffered<samples&&GetTickCount64()<deadline);
-        if(buffered<samples){s->frames_dropped+=(samples-buffered)/2;return 0;}
+        s->frames_dropped+=(samples-buffered)/2;
+        return 0;
     }
     std::memcpy(dst,s->pcm_buffer.data()+s->pcm_pos,samples*sizeof(int16_t));
     s->pcm_pos+=samples;s->frames_in+=samples/2;return samples;
