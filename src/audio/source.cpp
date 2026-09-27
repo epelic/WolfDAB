@@ -109,14 +109,11 @@ size_t wolfdab_source_read(wolfdab_source_t*s,int16_t*dst,size_t samples){
     }
     if(s->kind==WOLFDAB_SOURCE_TONE){for(size_t i=0;i<samples;i+=2){int16_t v=(int16_t)std::lrint(std::sin(s->phase)*s->amplitude);dst[i]=v;if(i+1<samples)dst[i+1]=v;s->phase+=s->step;if(s->phase>=6.2831853071795864769)s->phase-=6.2831853071795864769;}s->frames_in+=samples/2;return samples;}
     /* FFmpeg's pipe chunks do not necessarily match an AAC/MP2 input frame.
-     * Keep a short non-blocking prebuffer and return only complete blocks;
-     * appending silence after a partial read breaks waveform continuity. */
-    DWORD available=0;
-    if(!PeekNamedPipe(s->pipe,nullptr,0,nullptr,&available,nullptr)) {
-        restart_if_ended(s);
-        return 0;
-    }
-    if(available) {
+     * Keep a non-blocking prebuffer and return only complete blocks. */
+    auto pull_available=[&]()->bool{
+        DWORD available=0;
+        if(!PeekNamedPipe(s->pipe,nullptr,0,nullptr,&available,nullptr))return false;
+        if(!available)return true;
         if(s->pcm_pos && (s->pcm_pos>32768 || s->pcm_pos*2>s->pcm_buffer.size())){
             s->pcm_buffer.erase(s->pcm_buffer.begin(),s->pcm_buffer.begin()+
                                 (std::vector<int16_t>::difference_type)s->pcm_pos);
@@ -128,16 +125,23 @@ size_t wolfdab_source_read(wolfdab_source_t*s,int16_t*dst,size_t samples){
             s->pcm_buffer.resize(old+want/sizeof(int16_t));
             DWORD got=0;
             if(!ReadFile(s->pipe,s->pcm_buffer.data()+old,want,&got,nullptr)){
-                s->pcm_buffer.resize(old);restart_if_ended(s);return 0;
+                s->pcm_buffer.resize(old);return false;
             }
             s->pcm_buffer.resize(old+got/sizeof(int16_t));
         }
-    }
+        return true;
+    };
+    if(!pull_available()){restart_if_ended(s);return 0;}
     restart_if_ended(s);
-    const size_t buffered=s->pcm_buffer.size()-s->pcm_pos;
-    const size_t prebuffer=(size_t)s->sample_rate*2u/10u;
+    size_t buffered=s->pcm_buffer.size()-s->pcm_pos;
+    const size_t prebuffer=(size_t)s->sample_rate*2u/5u; /* 200 ms stereo */
     if(!s->pcm_primed){if(buffered<std::max(samples,prebuffer))return 0;s->pcm_primed=true;}
-    if(buffered<samples){s->pcm_primed=false;return 0;}
+    /* Preserve accumulated audio through short FFmpeg/Windows delays. */
+    if(buffered<samples){
+        const ULONGLONG deadline=GetTickCount64()+12;
+        do{Sleep(1);if(!pull_available())break;buffered=s->pcm_buffer.size()-s->pcm_pos;}while(buffered<samples&&GetTickCount64()<deadline);
+        if(buffered<samples){s->frames_dropped+=(samples-buffered)/2;return 0;}
+    }
     std::memcpy(dst,s->pcm_buffer.data()+s->pcm_pos,samples*sizeof(int16_t));
     s->pcm_pos+=samples;s->frames_in+=samples/2;return samples;
 }
