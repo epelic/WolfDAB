@@ -5,10 +5,10 @@ InstallDir "$PROGRAMFILES64\WolfDAB PlutoSDR"
 InstallDirRegKey HKLM "Software\WolfDAB-PlutoSDR" "InstallDir"
 RequestExecutionLevel admin
 BrandingText "WolfDAB PlutoSDR"
-VIProductVersion "1.0.17.0"
+VIProductVersion "1.0.18.0"
 VIAddVersionKey /LANG=1033 "ProductName" "WolfDAB PlutoSDR"
-VIAddVersionKey /LANG=1033 "ProductVersion" "1.0.17"
-VIAddVersionKey /LANG=1033 "FileVersion" "1.0.17"
+VIAddVersionKey /LANG=1033 "ProductVersion" "1.0.18"
+VIAddVersionKey /LANG=1033 "FileVersion" "1.0.18"
 VIAddVersionKey /LANG=1033 "CompanyName" "Freewaves.it"
 VIAddVersionKey /LANG=1033 "FileDescription" "WolfDAB PlutoSDR Installer"
 VIAddVersionKey /LANG=1033 "LegalCopyright" "Copyright Freewaves.it - Emanuele Pelicioli"
@@ -69,7 +69,7 @@ Section "WolfDAB PlutoSDR" SEC_MAIN
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WolfDAB-PlutoSDR" "DisplayIcon" "$INSTDIR\WolfDAB-PlutoSDR.exe"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WolfDAB-PlutoSDR" "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WolfDAB-PlutoSDR" "Publisher" "Freewaves.it"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WolfDAB-PlutoSDR" "DisplayVersion" "1.0.17"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WolfDAB-PlutoSDR" "DisplayVersion" "1.0.18"
   CreateDirectory "$SMPROGRAMS\WolfDAB PlutoSDR"
   CreateShortcut "$SMPROGRAMS\WolfDAB PlutoSDR\WolfDAB PlutoSDR.lnk" "$INSTDIR\WolfDAB-PlutoSDR.exe" "" "$INSTDIR\WolfDAB-PlutoSDR.exe" 0
   CreateShortcut "$DESKTOP\WolfDAB PlutoSDR.lnk" "$INSTDIR\WolfDAB-PlutoSDR.exe" "" "$INSTDIR\WolfDAB-PlutoSDR.exe" 0
